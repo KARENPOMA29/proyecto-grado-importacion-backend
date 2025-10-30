@@ -2,6 +2,13 @@ from pydantic import BaseModel
 from datetime import datetime
 from typing import Optional
 
+class ModeloProductoOut(BaseModel):
+    id: int
+    nombreModelo: str | None = None
+
+    class Config:
+        orm_mode = True
+
 # Base
 class ModeloProductoBase(BaseModel):
     nombreModelo: str

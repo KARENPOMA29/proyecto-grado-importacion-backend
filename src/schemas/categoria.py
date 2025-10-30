@@ -1,5 +1,11 @@
 from pydantic import BaseModel
 from typing import Optional
+class CategoriaOut(BaseModel):
+    id: int
+    nombre: str | None = None
+
+    class Config:
+        orm_mode = True
 
 # Base
 class CategoriaBase(BaseModel):

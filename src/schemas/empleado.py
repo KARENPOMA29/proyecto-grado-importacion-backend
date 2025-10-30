@@ -25,7 +25,6 @@ class EmpleadoUpdate(BaseModel):
     rol: Optional[str]
     usuario: Optional[str]
     correo: Optional[EmailStr]
-    contrasena: Optional[str]
     urlImagen: Optional[str]
 
 class EmpleadoResponse(EmpleadoBase):

@@ -2,6 +2,13 @@ from pydantic import BaseModel
 from datetime import datetime
 from typing import Optional
 
+class AlmacenOut(BaseModel):
+    id: int
+    nombre: str | None = None
+
+    class Config:
+        orm_mode = True
+
 # Base
 class AlmacenBase(BaseModel):
     nombre: str
