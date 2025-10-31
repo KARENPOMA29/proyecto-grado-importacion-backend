@@ -5,7 +5,7 @@ class CategoriaOut(BaseModel):
     nombre: str | None = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # Base
 class CategoriaBase(BaseModel):
