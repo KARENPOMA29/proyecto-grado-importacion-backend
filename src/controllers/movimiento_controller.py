@@ -1,4 +1,4 @@
-# src/crud/movimiento.py
+
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 

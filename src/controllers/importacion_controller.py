@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from fastapi import HTTPException
 from datetime import datetime
 from sqlalchemy import or_
-
+from src.models.producto import Producto 
 from src.models.importacion import Importacion
 from src.schemas.importacion import ImportacionCreate, ImportacionUpdate, ImportacionOut
 
@@ -58,7 +58,24 @@ def actualizar_importacion(db: Session, importacion_id: int, payload: Importacio
 
 def eliminar_importacion(db: Session, importacion_id: int):
     obj = obtener_importacion(db, importacion_id)
+    if not obj:
+        raise HTTPException(status_code=404, detail="Importación no encontrada o ya eliminada")
+
+    # ⚠️ Verificar si existen productos activos vinculados a esta importación
+    productos_activos = db.query(Producto).filter(
+        Producto.importacionId == importacion_id,
+        Producto.estado == 1  # o Producto.activo == 1, según tu modelo
+    ).count()
+
+    if productos_activos > 0:
+        raise HTTPException(
+            status_code=400,
+            detail=f"No se puede eliminar la importación porque tiene {productos_activos} productos activos."
+        )
+
+    # ✅ Si no tiene productos activos, la marcamos como inactiva
     obj.activo = 0
     obj.fechaActualizacion = datetime.utcnow()
     db.commit()
-    return {"ok": True}
+
+    return {"ok": True, "mensaje": "Importación eliminada correctamente"}

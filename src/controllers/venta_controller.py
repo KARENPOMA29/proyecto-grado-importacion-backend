@@ -8,6 +8,7 @@ from src.models.venta import Venta
 from src.models.detalle_venta import DetalleVenta
 from src.models.producto import Producto
 from src.schemas.venta import VentaCreate
+from src.models.modelo_producto import ModeloProducto
 
 
 def _generar_siguiente_codigo(db: Session) -> str:
@@ -21,12 +22,8 @@ def _generar_siguiente_codigo(db: Session) -> str:
     nro = int(ultima.codigoVenta) + 1
     return f"{nro:06d}"
 
-
 def crear_venta(db: Session, venta_in: VentaCreate) -> Venta:
-    # Generar el código automáticamente si no viene desde el frontend
     codigo = venta_in.codigoVenta or _generar_siguiente_codigo(db)
-
-    # Calcular total
     total = sum(det.subtotal for det in venta_in.detalles)
 
     venta_db = Venta(
@@ -36,35 +33,45 @@ def crear_venta(db: Session, venta_in: VentaCreate) -> Venta:
         codigoVenta=codigo,
         total=total,
         fechaRegistro=datetime.utcnow(),
-        estado=1,  # activo
+        estado=1,
     )
     db.add(venta_db)
-    db.flush()  # ya tengo venta_db.id
+    db.flush()  # obtengo id de la venta
 
-    # Procesar los detalles de venta
     for det in venta_in.detalles:
-      # solo productos disponibles
-      prod = (
-          db.query(Producto)
-          .filter(Producto.id == det.productoId, Producto.estado == 1)
-          .first()
-      )
-      if not prod:
-          raise HTTPException(
-              status_code=400,
-              detail=f"Producto {det.productoId} no existe o ya está vendido",
-          )
+        # buscar producto disponible
+        prod = (
+            db.query(Producto)
+            .filter(Producto.id == det.productoId, Producto.estado == 1)
+            .first()
+        )
+        if not prod:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Producto {det.productoId} no existe o ya fue vendido",
+            )
 
-      detalle_db = DetalleVenta(
-          ventaId=venta_db.id,
-          productoId=det.productoId,
-          subtotal=det.subtotal,
-      )
-      db.add(detalle_db)
+        # crear detalle
+        detalle_db = DetalleVenta(
+            ventaId=venta_db.id,
+            productoId=det.productoId,
+            subtotal=det.subtotal,
+        )
+        db.add(detalle_db)
 
-      # Marcar producto como vendido
-      prod.estado = 2  # 1 = disponible, 2 = vendido
-      db.add(prod)
+        # marcar producto como vendido
+        prod.estado = 2
+        db.add(prod)
+
+        # 🔽 descontar 1 del modelo
+        modelo = (
+            db.query(ModeloProducto)
+            .filter(ModeloProducto.id == prod.modeloId)
+            .first()
+        )
+        if modelo and modelo.stockActual > 0:
+            modelo.stockActual -= 1
+            db.add(modelo)
 
     db.commit()
     db.refresh(venta_db)
@@ -120,31 +127,31 @@ def obtener_venta_por_id(db: Session, venta_id: int):
 
 # 👇 NUEVO
 def cancelar_venta(db: Session, venta_id: int):
-    """
-    Cancela/anula una venta:
-    - marca la venta como inactiva/anulada
-    - vuelve a poner en disponible (estado = 1) todos los productos de esa venta
-    """
-    # 1. obtener la venta
     venta = db.query(Venta).filter(Venta.id == venta_id, Venta.estado == 1).first()
     if not venta:
         raise HTTPException(status_code=404, detail="La venta no existe o ya está cancelada")
 
-    # 2. obtener sus detalles
     detalles = db.query(DetalleVenta).filter(DetalleVenta.ventaId == venta_id).all()
 
-    # 3. recorrer productos y devolverlos a disponible
     for det in detalles:
         prod = db.query(Producto).filter(Producto.id == det.productoId).first()
         if prod:
-            prod.estado = 1  # disponible
+            # volver producto a disponible
+            prod.estado = 1
             db.add(prod)
 
-    # 4. marcar la venta como cancelada
-    venta.estado = 0  # o 2 = anulada, según tu convención
-    # si quieres guardar fecha de cancelación, aquí:
-    # venta.fechaActualizacion = datetime.utcnow()
+            # 🔼 devolver 1 al stock del modelo
+            modelo = (
+                db.query(ModeloProducto)
+                .filter(ModeloProducto.id == prod.modeloId)
+                .first()
+            )
+            if modelo:
+                modelo.stockActual += 1
+                db.add(modelo)
 
+    # marcar venta como cancelada
+    venta.estado = 0
     db.add(venta)
     db.commit()
     db.refresh(venta)

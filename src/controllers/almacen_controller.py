@@ -3,7 +3,7 @@ from fastapi import HTTPException
 from src.models.almacen import Almacen
 from src.models.sucursal import Sucursal
 from src.schemas.almacen import AlmacenCreate, AlmacenUpdate
-
+from src.models.seccion import Seccion 
 # Crear almacén
 def crear_almacen(db: Session, almacen: AlmacenCreate):
     # Validar sucursal activa (si se envía)
@@ -73,10 +73,26 @@ def actualizar_almacen(db: Session, almacen_id: int, datos: AlmacenUpdate):
 
 # Eliminación lógica
 def eliminar_almacen(db: Session, almacen_id: int):
-    almacen = db.query(Almacen).filter(Almacen.id == almacen_id, Almacen.estado == 1).first()
+    almacen = db.query(Almacen).filter(
+        Almacen.id == almacen_id,
+        Almacen.estado == 1
+    ).first()
     if not almacen:
         raise HTTPException(status_code=404, detail="Almacén no encontrado o ya eliminado")
 
+    # 🔎 validar si tiene secciones activas / disponibles
+    secciones_activas = db.query(Seccion).filter(
+        Seccion.almacenId == almacen_id,   # 👈 FK al almacén
+        Seccion.estado == 1                # o .activo == 1
+    ).count()
+
+    if secciones_activas > 0:
+        raise HTTPException(
+            status_code=400,
+            detail=f"No se puede eliminar el almacén porque tiene {secciones_activas} sección(es) activas."
+        )
+
+    # ✅ si no tiene secciones, eliminación lógica
     almacen.estado = 0
     db.commit()
     return {"mensaje": "Almacén eliminado correctamente (lógicamente)"}

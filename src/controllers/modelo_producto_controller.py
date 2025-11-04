@@ -2,7 +2,8 @@ from sqlalchemy.orm import Session
 from fastapi import HTTPException
 from src.models.modelo_producto import ModeloProducto
 from src.schemas.modelo_producto import ModeloProductoCreate, ModeloProductoUpdate
-
+from src.models.producto import Producto         # <- si tu modelo se llama distinto, cámbialo
+from src.models.seccion import Seccion 
 # Crear modelo
 def crear_modelo(db: Session, modelo: ModeloProductoCreate):
     existente = db.query(ModeloProducto).filter(
@@ -58,6 +59,7 @@ def actualizar_modelo(db: Session, modelo_id: int, datos: ModeloProductoUpdate):
     db.refresh(modelo)
     return modelo
 
+
 # Eliminación lógica
 def eliminar_modelo(db: Session, modelo_id: int):
     modelo = db.query(ModeloProducto).filter(
@@ -67,6 +69,31 @@ def eliminar_modelo(db: Session, modelo_id: int):
     if not modelo:
         raise HTTPException(status_code=404, detail="Modelo no encontrado o ya eliminado")
 
+    # 🔎 1) validar productos activos que usen este modelo
+    productos_activos = db.query(Producto).filter(
+        Producto.modeloId == modelo_id,     # cambia al nombre real de tu FK
+        Producto.estado == 1                # o .activo == 1 según tu tabla
+    ).count()
+
+    if productos_activos > 0:
+        raise HTTPException(
+            status_code=400,
+            detail=f"No se puede eliminar el modelo porque tiene {productos_activos} producto(s) activos vinculados."
+        )
+
+    # 🔎 2) validar secciones activas que usen este modelo
+    secciones_activas = db.query(Seccion).filter(
+        Seccion.modeloId == modelo_id,      # cambia al nombre real
+        Seccion.estado == 1                 # o .activo == 1
+    ).count()
+
+    if secciones_activas > 0:
+        raise HTTPException(
+            status_code=400,
+            detail=f"No se puede eliminar el modelo porque tiene {secciones_activas} sección(es) activas vinculadas."
+        )
+
+    # ✅ si no hay dependencias, eliminación lógica
     modelo.estado = 0
     db.commit()
     return {"mensaje": "Modelo eliminado correctamente (lógicamente)"}

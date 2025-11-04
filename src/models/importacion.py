@@ -17,4 +17,3 @@ class Importacion(Base):
     empleadoId = Column(Integer, ForeignKey("Empleado.id"), nullable=False)
     fechaLlegada = Column(Date, nullable=False)
     activo = Column(SmallInteger, nullable=False, default=1)  # tinyint en SQL Server
-

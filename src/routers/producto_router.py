@@ -13,6 +13,14 @@ router = APIRouter(prefix="/productos", tags=["Productos"])
 def list_products(db: Session = Depends(get_db)):
     return controller.listar_productos(db)
 
+@router.get("/by-serie/{numero_serie}")
+def get_by_serie(numero_serie: str, db: Session = Depends(get_db)):
+    prod = controller.obtener_producto_por_serie(db, numero_serie)
+    # si no hay, devolvemos null para que el front sepa que está libre
+    if not prod:
+        return None
+    return prod
+
 # Obtener uno
 @router.get("/{producto_id}", response_model=ProductoOut)
 def get_product(producto_id: int, db: Session = Depends(get_db)):
