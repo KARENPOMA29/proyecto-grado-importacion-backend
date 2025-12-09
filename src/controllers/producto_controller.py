@@ -1,22 +1,23 @@
 # src/controllers/producto_controller.py
+from typing import Optional
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 
-from src.schemas import producto
 from src.models.producto import Producto
 from src.schemas.producto import ProductoCreate, ProductoUpdate
 
 
+# -------------------------------------------------------------------
+# CREAR PRODUCTO
+# -------------------------------------------------------------------
 def crear_producto(db: Session, producto: ProductoCreate):
-    # validar numeroSerie único (solo activos)
-    # validar numeroSerie único (activos o vendidos)
-# validar numeroSerie único (activos o vendidos)
+    # Validar número de serie único (activos o vendidos)
     if producto.numeroSerie:
         existente = (
             db.query(Producto)
             .filter(
                 Producto.numeroSerie == producto.numeroSerie,
-                Producto.estado.in_([1, 2]),   # 👈 aquí el cambio
+                Producto.estado.in_([1, 2]),  # 1 = activo, 2 = vendido
             )
             .first()
         )
@@ -26,29 +27,46 @@ def crear_producto(db: Session, producto: ProductoCreate):
                 detail="Ya existe un producto con ese número de serie (activo o vendido).",
             )
 
-
-    nuevo = Producto(**producto.dict())
+    data = producto.model_dump()  # 👈 compatibilidad Pydantic v2
+    nuevo = Producto(**data)
     db.add(nuevo)
     db.commit()
     db.refresh(nuevo)
     return nuevo
 
+
+# -------------------------------------------------------------------
+# OBTENER PRODUCTO POR NÚMERO DE SERIE
+# -------------------------------------------------------------------
 def obtener_producto_por_serie(db: Session, numero_serie: str):
     producto = (
-        db.query(Producto)
-        .filter(
-            Producto.numeroSerie == numero_serie,
-            Producto.estado.in_([1, 2]),   # 👈 igual que arriba
-        )
-        .first()
+      db.query(Producto)
+      .filter(
+          Producto.numeroSerie == numero_serie,
+          Producto.estado.in_([1, 2]),  # activos o vendidos
+      )
+      .first()
     )
     return producto
 
-def listar_productos(db: Session):
-    # solo activos
-    return db.query(Producto).filter(Producto.estado == 1).all()
+
+# -------------------------------------------------------------------
+# LISTAR PRODUCTOS (con filtro opcional por estado)
+#   estado = 1 -> solo disponibles (por defecto)
+#   estado = 2 -> vendidos
+#   estado = 0 -> inactivos
+#   estado = None -> todos
+# -------------------------------------------------------------------
+def listar_productos(db: Session, estado: Optional[int] = 1):
+    query = db.query(Producto)
+    if estado is not None:
+        query = query.filter(Producto.estado == estado)
+    return query.all()
 
 
+# -------------------------------------------------------------------
+# OBTENER PRODUCTO POR ID (solo activos)
+# -------------------------------------------------------------------
 def obtener_producto(db: Session, producto_id: int):
     producto = (
         db.query(Producto)
@@ -56,10 +74,16 @@ def obtener_producto(db: Session, producto_id: int):
         .first()
     )
     if not producto:
-        raise HTTPException(status_code=404, detail="Producto no encontrado o inactivo")
+        raise HTTPException(
+            status_code=404,
+            detail="Producto no encontrado o inactivo."
+        )
     return producto
 
 
+# -------------------------------------------------------------------
+# ACTUALIZAR PRODUCTO
+# -------------------------------------------------------------------
 def actualizar_producto(db: Session, producto_id: int, datos: ProductoUpdate):
     producto = (
         db.query(Producto)
@@ -67,15 +91,18 @@ def actualizar_producto(db: Session, producto_id: int, datos: ProductoUpdate):
         .first()
     )
     if not producto:
-        raise HTTPException(status_code=404, detail="Producto no encontrado o inactivo")
+        raise HTTPException(
+            status_code=404,
+            detail="Producto no encontrado o inactivo."
+        )
 
-    # si actualiza numeroSerie, validamos que no choque
+    # Validar duplicado de número de serie si lo está cambiando
     if datos.numeroSerie is not None:
         existe = (
             db.query(Producto)
             .filter(
                 Producto.numeroSerie == datos.numeroSerie,
-                Producto.estado.in_([1, 2]),   # 👈 aquí
+                Producto.estado.in_([1, 2]),
                 Producto.id != producto_id,
             )
             .first()
@@ -86,8 +113,9 @@ def actualizar_producto(db: Session, producto_id: int, datos: ProductoUpdate):
                 detail="Ya existe otro producto con ese número de serie (activo o vendido).",
             )
 
-
-    for key, value in datos.dict(exclude_unset=True).items():
+    # Aplicar actualizaciones
+    update_data = datos.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
         setattr(producto, key, value)
 
     db.commit()
@@ -95,6 +123,9 @@ def actualizar_producto(db: Session, producto_id: int, datos: ProductoUpdate):
     return producto
 
 
+# -------------------------------------------------------------------
+# ELIMINAR PRODUCTO (lógico)
+# -------------------------------------------------------------------
 def eliminar_producto(db: Session, producto_id: int):
     producto = (
         db.query(Producto)
@@ -102,8 +133,11 @@ def eliminar_producto(db: Session, producto_id: int):
         .first()
     )
     if not producto:
-        raise HTTPException(status_code=404, detail="Producto no encontrado o ya eliminado")
+        raise HTTPException(
+            status_code=404,
+            detail="Producto no encontrado o ya eliminado."
+        )
 
-    producto.estado = 0  # borrado lógico
+    producto.estado = 0  # Borrado lógico
     db.commit()
-    return {"mensaje": "Producto eliminado correctamente (lógico)"}
+    return {"mensaje": "Producto eliminado correctamente (lógico)."}

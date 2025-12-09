@@ -17,7 +17,7 @@ class DetalleVentaOut(DetalleVentaBase):
     id: int
 
     class Config:
-        from_attributes = True
+        orm_mode = True
 
 
 class VentaBase(BaseModel):
@@ -39,5 +39,5 @@ class VentaOut(VentaBase):
     detalles: List[DetalleVentaOut]
 
     class Config:
-        from_attributes = True
+        orm_mode = True
 

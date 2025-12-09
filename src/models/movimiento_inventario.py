@@ -10,3 +10,4 @@ class MovimientoInventario(Base):
     tipoMovimiento = Column(String(20), nullable=False)
     fecha = Column(DateTime, default=datetime.utcnow, nullable=False)
     usuarioId = Column(Integer, ForeignKey("Empleado.id"), nullable=True)
+    estado = Column(Integer, default=1)

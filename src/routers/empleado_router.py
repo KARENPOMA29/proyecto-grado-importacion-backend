@@ -1,10 +1,14 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, APIRouter, UploadFile, File
 from sqlalchemy.orm import Session
 from typing import List
 from src.config.db import SessionLocal
 from src.controllers import empleado_controller
-from src.schemas.empleado import EmpleadoCreate, EmpleadoResponse, EmpleadoUpdate
-
+from uuid import uuid4
+import os
+from pathlib import Path
+from src.schemas.empleado import EmpleadoCreate, EmpleadoResponse, EmpleadoUpdate, ImagenEmpleadoResponse
+from src.config.paths import EMPLEADOS_DIR
+    
 router = APIRouter(prefix="/empleados", tags=["Empleados"])
 
 def get_db():
@@ -13,6 +17,26 @@ def get_db():
         yield db
     finally:
         db.close()
+
+@router.post("/upload-imagen", response_model=ImagenEmpleadoResponse)
+async def upload_imagen_empleado(file: UploadFile = File(...)):
+    ext_permitidas = {"jpg", "jpeg", "png", "webp"}
+    nombre_original = file.filename or ""
+    ext = nombre_original.rsplit(".", 1)[-1].lower()
+
+    if ext not in ext_permitidas:
+        raise HTTPException(status_code=400, detail="Formato de imagen no permitido.")
+
+    EMPLEADOS_DIR.mkdir(parents=True, exist_ok=True)
+    filename = f"{uuid4().hex}.{ext}"
+    file_path = EMPLEADOS_DIR / filename
+
+    contenido = await file.read()
+    with open(file_path, "wb") as f:
+        f.write(contenido)
+
+    url = f"/archivos/empleados/{filename}"
+    return ImagenEmpleadoResponse(urlImagen=url)
 
 # 📍 Crear un nuevo empleado
 @router.post("/", response_model=EmpleadoResponse)

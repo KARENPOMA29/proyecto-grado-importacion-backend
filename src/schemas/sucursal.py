@@ -1,26 +1,29 @@
+# src/schemas/sucursal.py
 from pydantic import BaseModel
 from datetime import datetime
 from typing import Optional
 
-# Base
 class SucursalBase(BaseModel):
     nombre: str
     telefono: Optional[str] = None
+    direccion: Optional[str] = None
+    idCiudad: Optional[int] = None
 
-# Crear
 class SucursalCreate(SucursalBase):
     pass
 
-# Actualizar
 class SucursalUpdate(BaseModel):
-    nombre: Optional[str]
-    telefono: Optional[str]
+    nombre: Optional[str] = None
+    telefono: Optional[str] = None
+    direccion: Optional[str] = None
+    idCiudad: Optional[int] = None
 
-# Respuesta
 class SucursalResponse(SucursalBase):
     id: int
     fechaRegistro: datetime
     estado: int
 
+    ciudadNombre: Optional[str] = None   # 🔥 Front recibe esto
+
     class Config:
-        from_attributes = True
+        orm_mode = True

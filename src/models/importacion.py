@@ -11,9 +11,8 @@ class Importacion(Base):
     codigo = Column(String(50), nullable=False)
     proveedorId = Column(Integer, ForeignKey("Proveedor.id"), nullable=False)
     fechaRegistro = Column(DateTime, nullable=False, default=datetime.utcnow)
-    estado = Column(String(30), nullable=False)              # "En tránsito" / "En aduana" / "Entregado"
-    fechaActualizacion = Column(DateTime, nullable=True)
-    observaciones = Column(String(200), nullable=True)
-    empleadoId = Column(Integer, ForeignKey("Empleado.id"), nullable=False)
+    estado = Column(SmallInteger, nullable=False, server_default="1")
+    descripcion = Column(String(200), nullable=True)
+    empleadoId = Column(Integer, nullable=False)
     fechaLlegada = Column(Date, nullable=False)
-    activo = Column(SmallInteger, nullable=False, default=1)  # tinyint en SQL Server
+    idEmpleadoAsignado = Column(Integer, ForeignKey("Empleado.id"), nullable=False)

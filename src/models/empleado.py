@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Text
+from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey
 from datetime import datetime
 from src.config.db import Base
 
@@ -18,3 +18,4 @@ class Empleado(Base):
     urlImagen = Column(String(500))
     estado = Column(Integer, default=1)
     correo = Column(String(100))
+    idSucursal = Column(Integer, ForeignKey("Sucursal.id"), nullable=True)

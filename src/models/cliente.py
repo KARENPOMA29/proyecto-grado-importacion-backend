@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime
+from sqlalchemy import Column, Integer, String, DateTime, func
 from datetime import datetime
 from src.config.db import Base
 
@@ -6,10 +6,9 @@ class Cliente(Base):
     __tablename__ = "Cliente"
 
     id = Column(Integer, primary_key=True, index=True)
-    nombre = Column(String(50), nullable=False)
-    apellido = Column(String(50), nullable=False)
-    segundoApellido = Column(String(50))
+    razonSocial = Column(String(250), nullable=False)
+    nit = Column(String(20), nullable=False)
     correo = Column(String(60), nullable=False)
-    ci = Column(String(50), nullable=False)
-    fechaRegistro = Column(DateTime, default=datetime.utcnow)
-    estado = Column(Integer, default=1)
+    telefono = Column(String(10), nullable=False)
+    fechaRegistro = Column(DateTime, nullable=False, server_default=func.getdate())
+    estado = Column(Integer, nullable=False, server_default="1")

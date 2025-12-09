@@ -1,6 +1,7 @@
-from fastapi import APIRouter, Depends
+# src/routers/seccion_router.py
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 from src.config.db import SessionLocal
 from src.schemas.seccion import SeccionCreate, SeccionUpdate, SeccionResponse
 from src.controllers import seccion_controller
@@ -19,8 +20,11 @@ def crear_seccion(seccion: SeccionCreate, db: Session = Depends(get_db)):
     return seccion_controller.crear_seccion(db, seccion)
 
 @router.get("/", response_model=List[SeccionResponse])
-def listar_secciones(db: Session = Depends(get_db)):
-    return seccion_controller.listar_secciones(db)
+def listar_secciones(
+    almacen_id: Optional[int] = Query(default=None, alias="almacenId"),
+    db: Session = Depends(get_db),
+):
+    return seccion_controller.listar_secciones(db, almacen_id)
 
 @router.get("/{seccion_id}", response_model=SeccionResponse)
 def obtener_seccion(seccion_id: int, db: Session = Depends(get_db)):

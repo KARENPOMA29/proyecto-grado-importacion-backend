@@ -1,4 +1,3 @@
-# src/schemas/movimiento.py
 from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
@@ -16,14 +15,16 @@ class MovimientoBase(BaseModel):
     tipoMovimiento: str
 
 
+# ✅ AQUI AGREGAMOS usuarioId OPCIONAL
 class MovimientoCreate(MovimientoBase):
-    pass
+    usuarioId: Optional[int] = None
 
 
 class MovimientoUpdate(BaseModel):
     productoId: Optional[int] = None
     almacenId: Optional[int] = None
     tipoMovimiento: Optional[str] = None
+    usuarioId: Optional[int] = None  # también lo agregamos para coherencia
 
 
 class MovimientoOut(MovimientoBase):
@@ -43,5 +44,9 @@ class MovimientoOut(MovimientoBase):
     productoDescripcion: Optional[str] = None
     almacenNombre: Optional[str] = None
 
+    # nuevos: info de observación del producto
+    productoObservado: Optional[int] = None
+    productoObsDescripcion: Optional[str] = None
+
     class Config:
-        from_attributes = True
+        orm_mode = True

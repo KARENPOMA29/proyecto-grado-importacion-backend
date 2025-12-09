@@ -1,8 +1,10 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from src.routers import empleado_router, cliente_router, proveedor_router, categoria_router, modelo_producto_router, sucursal_router, almacen_router, seccion_router, auth_router, importacion_router, movimiento_router, producto_router, venta_router
+from fastapi.staticfiles import StaticFiles
+from src.routers import empleado_router, cliente_router, proveedor_router, categoria_router, modelo_producto_router, sucursal_router, almacen_router, seccion_router, auth_router, importacion_router, movimiento_router, producto_router, venta_router, movimiento_importacion_router, reportes_router ,ciudad_router, marca_router, alerta_router
 from src.config.db import Base, engine
-
+from src.config.paths import EMPLEADOS_DIR
+from fastapi.staticfiles import StaticFiles
 # 🗄️ Crear tablas si no existen
 Base.metadata.create_all(bind=engine)
 
@@ -21,6 +23,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.mount(
+    "/archivos",
+    StaticFiles(directory=str(EMPLEADOS_DIR.parent)),  # "Archivos" es el padre
+    name="archivos",
+)
+
 # 📍 Registrar rutas
 app.include_router(empleado_router.router)
 app.include_router(cliente_router.router)
@@ -34,6 +42,11 @@ app.include_router(importacion_router.router)
 app.include_router(movimiento_router.router)
 app.include_router(producto_router.router)
 app.include_router(venta_router.router)
+app.include_router(movimiento_importacion_router.router)
+app.include_router(reportes_router.router)
+app.include_router(ciudad_router.router)
+app.include_router(marca_router.router)
+app.include_router(alerta_router.router)
 app.include_router(auth_router.router, prefix="/auth", tags=["Autenticación"])
 # 📍 Ruta raíz
 @app.get("/")

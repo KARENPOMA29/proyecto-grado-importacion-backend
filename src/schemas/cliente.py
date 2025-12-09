@@ -1,14 +1,13 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, ConfigDict
 from datetime import datetime
 from typing import Optional
 
 # Base
 class ClienteBase(BaseModel):
-    nombre: str
-    apellido: str
-    segundoApellido: Optional[str]
+    razonSocial: str
+    nit: str
     correo: EmailStr
-    ci: str
+    telefono: str
 
 # Crear
 class ClienteCreate(ClienteBase):
@@ -16,11 +15,10 @@ class ClienteCreate(ClienteBase):
 
 # Actualizar
 class ClienteUpdate(BaseModel):
-    nombre: Optional[str]
-    apellido: Optional[str]
-    segundoApellido: Optional[str]
-    correo: Optional[EmailStr]
-    ci: Optional[str]
+    razonSocial: Optional[str] = None
+    nit: Optional[str] = None
+    correo: Optional[EmailStr] = None
+    telefono: Optional[str] = None
 
 # Respuesta
 class ClienteResponse(ClienteBase):
@@ -28,5 +26,5 @@ class ClienteResponse(ClienteBase):
     fechaRegistro: datetime
     estado: int
 
-    class Config:
-        from_attributes = True
+    # Pydantic v2
+    model_config = ConfigDict(orm_mode=True)

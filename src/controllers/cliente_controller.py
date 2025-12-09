@@ -3,56 +3,81 @@ from fastapi import HTTPException
 from src.models.cliente import Cliente
 from src.schemas.cliente import ClienteCreate, ClienteUpdate
 from src.models.venta import Venta
+
+
 # Crear cliente
-
 def crear_cliente(db: Session, cliente: ClienteCreate):
-    # normalizamos un poco por si vienen con espacios
-    nombre = (cliente.nombre or "").strip()
-    apellido = (cliente.apellido or "").strip()
+    # Normalizamos un poco por si vienen con espacios
+    razon = (cliente.razonSocial or "").strip()
+    nit = (cliente.nit or "").strip()
+    correo = (cliente.correo or "").strip()
+    telefono = (cliente.telefono or "").strip()
 
-    # 1) validar correo/ci duplicado
-    existente = db.query(Cliente).filter(
-        (
-            (Cliente.correo == cliente.correo) |
-            (Cliente.ci == cliente.ci)
-        ) &
-        (Cliente.estado == 1)
+    if not razon:
+        raise HTTPException(status_code=400, detail="La razón social es obligatoria.")
+    if not nit:
+        raise HTTPException(status_code=400, detail="El NIT es obligatorio.")
+
+    # 1) Validar NIT duplicado
+    existente_nit = db.query(Cliente).filter(
+        Cliente.nit == nit,
+        Cliente.estado == 1
     ).first()
-    if existente:
+    if existente_nit:
         raise HTTPException(
             status_code=400,
-            detail="Ya existe un cliente activo con ese correo o CI."
+            detail="Ya existe un cliente activo con ese NIT."
         )
 
-    # 2) validar nombre + apellido duplicado
-    if nombre and apellido:
-      mismo_nombre = db.query(Cliente).filter(
-          Cliente.nombre == nombre,
-          Cliente.apellido == apellido,
-          Cliente.segundoApellido == cliente.segundoApellido,
-          Cliente.estado == 1
-      ).first()
-      if mismo_nombre:
-          raise HTTPException(
-              status_code=400,
-              detail="Ya existe un cliente activo con el mismo nombre y apellidos."
-          )
+    # 2) Validar razón social duplicada
+    existente_razon = db.query(Cliente).filter(
+        Cliente.razonSocial == razon,
+        Cliente.estado == 1
+    ).first()
+    if existente_razon:
+        raise HTTPException(
+            status_code=400,
+            detail="Ya existe un cliente activo con esa razón social."
+        )
 
-    nuevo = Cliente(**cliente.dict())
+    # 3) Validar correo duplicado
+    existente_correo = db.query(Cliente).filter(
+        Cliente.correo == correo,
+        Cliente.estado == 1
+    ).first()
+    if existente_correo:
+        raise HTTPException(
+            status_code=400,
+            detail="Ya existe un cliente activo con ese correo."
+        )
+
+    nuevo = Cliente(
+        razonSocial=razon,
+        nit=nit,
+        correo=correo,
+        telefono=telefono
+    )
     db.add(nuevo)
     db.commit()
     db.refresh(nuevo)
     return nuevo
+
+
 # Listar todos los clientes activos
 def listar_clientes(db: Session):
     return db.query(Cliente).filter(Cliente.estado == 1).all()
 
+
 # Obtener cliente por ID (solo activos)
 def obtener_cliente(db: Session, cliente_id: int):
-    cliente = db.query(Cliente).filter(Cliente.id == cliente_id, Cliente.estado == 1).first()
+    cliente = db.query(Cliente).filter(
+        Cliente.id == cliente_id,
+        Cliente.estado == 1
+    ).first()
     if not cliente:
         raise HTTPException(status_code=404, detail="Cliente no encontrado o inactivo")
     return cliente
+
 
 # Actualizar datos
 def actualizar_cliente(db: Session, cliente_id: int, datos: ClienteUpdate):
@@ -63,15 +88,32 @@ def actualizar_cliente(db: Session, cliente_id: int, datos: ClienteUpdate):
     if not cliente:
         raise HTTPException(status_code=404, detail="Cliente no encontrado o inactivo")
 
-    # vamos a sacar lo que viene
-    payload = datos.dict(exclude_unset=True)
+    # Sacamos lo que viene en el payload
+    payload = datos.model_dump(exclude_unset=True)
 
-    nuevo_correo = payload.get("correo")
-    nuevo_ci = payload.get("ci")
-    nuevo_nombre = (payload.get("nombre") or cliente.nombre or "").strip()
-    nuevo_apellido = (payload.get("apellido") or cliente.apellido or "").strip()
+    # Normalizamos campos nuevos (si vienen)
+    if "razonSocial" in payload and payload["razonSocial"] is not None:
+        nueva_razon = (payload["razonSocial"] or "").strip()
+    else:
+        nueva_razon = (cliente.razonSocial or "").strip()
 
-    # 1) validar correo duplicado (en otro cliente activo)
+    nuevo_nit = payload.get("nit", cliente.nit)
+    nuevo_correo = payload.get("correo", cliente.correo)
+
+    # 1) Validar NIT duplicado (en otro cliente activo)
+    if nuevo_nit:
+        duplicado_nit = db.query(Cliente).filter(
+            Cliente.nit == nuevo_nit,
+            Cliente.id != cliente_id,
+            Cliente.estado == 1
+        ).first()
+        if duplicado_nit:
+            raise HTTPException(
+                status_code=400,
+                detail="NIT ya registrado por otro cliente activo."
+            )
+
+    # 2) Validar correo duplicado (en otro cliente activo)
     if nuevo_correo:
         duplicado_correo = db.query(Cliente).filter(
             Cliente.correo == nuevo_correo,
@@ -84,35 +126,24 @@ def actualizar_cliente(db: Session, cliente_id: int, datos: ClienteUpdate):
                 detail="Correo ya registrado por otro cliente activo."
             )
 
-    # 2) validar CI duplicado (en otro cliente activo)
-    if nuevo_ci:
-        duplicado_ci = db.query(Cliente).filter(
-            Cliente.ci == nuevo_ci,
+    # 3) Validar razón social duplicada (en otro cliente activo)
+    if nueva_razon:
+        duplicado_razon = db.query(Cliente).filter(
+            Cliente.razonSocial == nueva_razon,
             Cliente.id != cliente_id,
             Cliente.estado == 1
         ).first()
-        if duplicado_ci:
+        if duplicado_razon:
             raise HTTPException(
                 status_code=400,
-                detail="CI ya registrado por otro cliente activo."
+                detail="Ya existe otro cliente activo con esa razón social."
             )
 
-    # 3) validar nombre + apellido duplicado (en otro cliente activo)
-    if nuevo_nombre and nuevo_apellido:
-        duplicado_nombre = db.query(Cliente).filter(
-            Cliente.nombre == nuevo_nombre,
-            Cliente.apellido == nuevo_apellido,
-            Cliente.segundoApellido == cliente.segundoApellido,
-            Cliente.id != cliente_id,
-            Cliente.estado == 1
-        ).first()
-        if duplicado_nombre:
-            raise HTTPException(
-                status_code=400,
-                detail="Ya existe otro cliente activo con el mismo nombre y apellidos."
-            )
+    # Actualizamos el payload normalizado
+    if "razonSocial" in payload:
+        payload["razonSocial"] = nueva_razon
 
-    # ✅ si todo OK, actualizamos
+    # ✅ Si todo OK, actualizamos
     for key, value in payload.items():
         setattr(cliente, key, value)
 
@@ -120,18 +151,21 @@ def actualizar_cliente(db: Session, cliente_id: int, datos: ClienteUpdate):
     db.refresh(cliente)
     return cliente
 
-# Eliminación lógica
 
+# Eliminación lógica
 def eliminar_cliente(db: Session, cliente_id: int):
     # Buscar cliente activo
-    cliente = db.query(Cliente).filter(Cliente.id == cliente_id, Cliente.estado == 1).first()
+    cliente = db.query(Cliente).filter(
+        Cliente.id == cliente_id,
+        Cliente.estado == 1
+    ).first()
     if not cliente:
         raise HTTPException(status_code=404, detail="Cliente no encontrado o ya eliminado")
 
     # ⚠️ Verificar si tiene ventas activas
     ventas_activas = db.query(Venta).filter(
         Venta.clienteId == cliente_id,
-        Venta.estado == 1  # o Venta.activo == 1 según tu modelo
+        Venta.estado == 1  # Ajusta al campo real de tu modelo Venta
     ).count()
 
     if ventas_activas > 0:

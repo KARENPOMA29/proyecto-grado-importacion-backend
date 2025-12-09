@@ -1,18 +1,20 @@
+# src/schemas/almacen.py
 from pydantic import BaseModel
 from datetime import datetime
 from typing import Optional
 
 class AlmacenOut(BaseModel):
     id: int
-    nombre: str | None = None
+    nombre: Optional[str] = None
 
     class Config:
-       from_attributes  = True
+        orm_mode = True
 
 # Base
 class AlmacenBase(BaseModel):
     nombre: str
-    sucursalId: Optional[int] = None
+    direccion: str               # 👈 OBLIGATORIA
+    sucursalId: int              # 👈 OBLIGATORIO
 
 # Crear
 class AlmacenCreate(AlmacenBase):
@@ -20,14 +22,16 @@ class AlmacenCreate(AlmacenBase):
 
 # Actualizar
 class AlmacenUpdate(BaseModel):
-    nombre: Optional[str]
-    sucursalId: Optional[int]
+    nombre: Optional[str] = None
+    direccion: Optional[str] = None
+    sucursalId: Optional[int] = None
 
 # Respuesta
 class AlmacenResponse(AlmacenBase):
     id: int
     fechaRegistro: datetime
     estado: int
+    sucursalNombre: Optional[str] = None  # 👈 viene del @property del modelo
 
     class Config:
-        from_attributes = True
+        orm_mode = True

@@ -1,28 +1,71 @@
-# src/routes/movimiento_route.py
-from fastapi import APIRouter, Depends
+# src/routers/movimiento_router.py
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from src.config.db import get_db
+from typing import List, Optional
+
+from src.config.db import SessionLocal
+from src.controllers import movimiento_controller
 from src.schemas.movimiento import MovimientoCreate, MovimientoOut, MovimientoUpdate
-from src.controllers import movimiento_controller as ctl
 
 router = APIRouter(prefix="/movimientos", tags=["Movimientos"])
 
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+# 📦 Crear movimiento
 @router.post("/", response_model=MovimientoOut)
-def crear(payload: MovimientoCreate, db: Session = Depends(get_db)):
-    return ctl.crear_movimiento(db, payload, usuario_id=None)
+def crear_movimiento(
+    payload: MovimientoCreate,
+    db: Session = Depends(get_db),
+):
+    # si el schema MovimientoCreate tiene usuarioId opcional:
+    usuario_id = getattr(payload, "usuarioId", None)
+    return movimiento_controller.crear_movimiento(db, payload, usuario_id)
 
-@router.get("/", response_model=list[MovimientoOut])
-def listar(db: Session = Depends(get_db)):
-    return ctl.listar_movimientos(db)
+# 📋 Listar movimientos (filtros opcionales: usuarioId, almacenId)
+@router.get("/", response_model=List[MovimientoOut])
+def listar_movimientos(
+    usuarioId: Optional[int] = Query(default=None),
+    almacenId: Optional[int] = Query(default=None),
+    db: Session = Depends(get_db),
+):
+    return movimiento_controller.listar_movimientos(
+        db,
+        usuario_id=usuarioId,
+        almacen_id=almacenId,
+    )
 
+# 🔍 Obtener movimiento por ID
 @router.get("/{movimiento_id}", response_model=MovimientoOut)
-def obtener(movimiento_id: int, db: Session = Depends(get_db)):
-    return ctl.obtener_movimiento(db, movimiento_id)
+def obtener_movimiento(
+    movimiento_id: int,
+    db: Session = Depends(get_db),
+):
+    return movimiento_controller.obtener_movimiento(db, movimiento_id)
 
+# ✏️ Actualizar movimiento
 @router.put("/{movimiento_id}", response_model=MovimientoOut)
-def actualizar(movimiento_id: int, payload: MovimientoUpdate, db: Session = Depends(get_db)):
-    return ctl.actualizar_movimiento(db, movimiento_id, payload, usuario_id=None)
+def actualizar_movimiento(
+    movimiento_id: int,
+    payload: MovimientoUpdate,
+    db: Session = Depends(get_db),
+):
+    usuario_id = getattr(payload, "usuarioId", None)
+    return movimiento_controller.actualizar_movimiento(
+        db,
+        movimiento_id,
+        payload,
+        usuario_id,
+    )
 
+# 🗑️ Eliminar movimiento
 @router.delete("/{movimiento_id}")
-def eliminar(movimiento_id: int, db: Session = Depends(get_db)):
-    return ctl.eliminar_movimiento(db, movimiento_id)
+def eliminar_movimiento(
+    movimiento_id: int,
+    db: Session = Depends(get_db),
+):
+    return movimiento_controller.eliminar_movimiento(db, movimiento_id)

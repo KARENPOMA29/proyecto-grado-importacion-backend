@@ -32,6 +32,7 @@ def login_empleado(db: Session, credentials: LoginRequest):
         "rol": empleado.rol,
         "correo": empleado.correo,
         "usuario": empleado.usuario,
+        "idSucursal": empleado.idSucursal
     }
 
 

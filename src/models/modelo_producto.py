@@ -1,16 +1,34 @@
-from sqlalchemy import Column, Integer, String, DateTime
 from datetime import datetime
+from sqlalchemy import (
+    Column,
+    Integer,
+    SmallInteger,
+    String,
+    DateTime,
+    ForeignKey,
+    text,
+)
+from sqlalchemy.orm import relationship
 from src.config.db import Base
+
 
 class ModeloProducto(Base):
     __tablename__ = "ModeloProducto"
 
     id = Column(Integer, primary_key=True, index=True)
     nombreModelo = Column(String(50), nullable=False)
-    marca = Column(String(50), nullable=False)
-    capacidadOTamano = Column(Integer, nullable=True)
-    unidadMedida = Column(String(50), nullable=True)
+    capacidadOTamano = Column(Integer, nullable=False)
+    unidadMedida = Column(String(50), nullable=False)
     stockMinimo = Column(Integer, nullable=False)
-    stockActual = Column(Integer, nullable=False)
-    fechaRegistro = Column(DateTime, default=datetime.utcnow)
-    estado = Column(Integer, default=1)  # 1 = activo, 0 = eliminado
+    stockActual = Column(Integer, nullable=False, default=0, server_default=text("0"))
+    color = Column(String(50), nullable=False)
+    duracionGarantia = Column(SmallInteger, nullable=False)  # tinyint
+    tipoGarantia = Column(String(5), nullable=False)
+    fechaRegistro = Column(DateTime, default=datetime.utcnow, nullable=False)
+    estado = Column(SmallInteger, default=1, nullable=False)  # 1 = activo, 0 = eliminado
+    urlImagen = Column(String, nullable=True)  # varchar(MAX) en SQL Server
+
+    # 👉 FK según tu BDD
+    idMarca = Column(Integer, ForeignKey("Marca.id"), nullable=True)
+    marca = relationship("Marca", back_populates="modelos") 
+
