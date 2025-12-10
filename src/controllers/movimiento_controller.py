@@ -1,313 +1,234 @@
-# src/controllers/movimientoImportacion_controller.py
-
-from typing import List
-from fastapi import HTTPException, status
+# src/controllers/movimiento_controller.py
+from typing import Optional
+from fastapi import HTTPException
 from sqlalchemy.orm import Session
-from datetime import datetime
 
-from src.models.movimiento_importacion import MovimientoImportacion
-from src.models.alerta import Alerta
+from src.models.movimiento_inventario import MovimientoInventario
+from src.models.producto import Producto
+from src.models.modelo_producto import ModeloProducto
+from src.models.almacen import Almacen
+from src.models.categoria import Categoria
 from src.models.importacion import Importacion
-from src.models.empleado import Empleado
 
-from src.schemas.movimiento_importacion import (
-    MovimientoImportacionCreate,
-    MovimientoImportacionUpdate,
-    MovimientoImportacionOut,
-    MovimientoEstadoOut,
-)
+from src.schemas.movimiento import MovimientoCreate, MovimientoUpdate
+# src/controllers/movimiento_controller.py
 
-from src.utils.mailer import enviar_notificacion_movimiento
-
-# 👇 mismo orden/códigos que en el front
-PASOS = [
-    {"code": "PEDIDO", "label": "Pedido confirmado"},
-    {"code": "PRODUCCION", "label": "En producción"},
-    {"code": "TRANS_INT", "label": "En tránsito internacional"},
-    {"code": "PUERTO", "label": "Llegada a puerto"},
-    {"code": "LISTO_ENV", "label": "Listo para envío"},
-    {"code": "ADUANA_BO", "label": "Despacho aduanero Bolivia"},
-    {"code": "TRANS_NAC", "label": "En tránsito nacional"},
-    {"code": "ENTREGADO", "label": "Entregado"},
-]
-
-
-def _recalcular_estado_importacion(db: Session, importacion_id: int) -> None:
+def _adjuntar_extras(db: Session, mov: MovimientoInventario):
     """
-    Si la importación tiene TODOS los PASOS registrados,
-    se marca como CONCLUIDA (estado = 2).
-    """
-    imp = (
-        db.query(Importacion)
-        .filter(Importacion.id == importacion_id)
-        .first()
-    )
-    if not imp:
-        return
-
-    # Si ya está concluida, no hacemos nada
-    if imp.estado == 2:
-        return
-
-    # Traer todos los movimientos de esa importación
-    movimientos = (
-        db.query(MovimientoImportacion)
-        .filter(MovimientoImportacion.importacionId == importacion_id)
-        .all()
-    )
-
-    tipos_presentes = {
-        (m.tipoMovimiento or "").upper() for m in movimientos
-    }
-    codes_requeridos = {p["code"] for p in PASOS}
-
-    # Si ya se registraron TODOS los pasos -> concluida
-    if codes_requeridos.issubset(tipos_presentes):
-        imp.estado = 2  # CONCLUIDA
-        db.commit()
-        db.refresh(imp)
-
-
-def crear_movimiento_importacion(
-    db: Session,
-    data: MovimientoImportacionCreate,
-) -> MovimientoImportacion:
-    """
-    Crea un nuevo movimiento de importación.
-    - Normaliza tipoMovimiento a MAYÚSCULAS.
-    - Envía alerta/correo al admin.
-    - Recalcula estado de la importación (marca estado = 2 si ya se completaron todos los pasos).
+    Completa el objeto movimiento con:
+    - producto, modeloProducto, categoria, importacion
+    - campos planos: productoSerie, productoDescripcion,
+      productoObservado, productoObsDescripcion, almacenNombre
     """
 
-    # 0) Verificar que la importación exista y no esté concluida
-    imp = (
-        db.query(Importacion)
-        .filter(Importacion.id == data.importacionId)
-        .first()
-    )
-    if not imp:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Importación no encontrada",
-        )
-
-    if imp.estado == 2:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="La importación ya está concluida. No se pueden registrar más movimientos.",
-        )
-
-    # 1) Crear movimiento
-    nuevo = MovimientoImportacion(
-        importacionId=data.importacionId,
-        tipoMovimiento=(data.tipoMovimiento or "").upper().strip(),
-        descripcion=data.descripcion,
-        rutaArchivo=data.rutaArchivo,
-        idEmpleadoEncargado=data.idEmpleadoEncargado,
-    )
-
-    db.add(nuevo)
-    db.commit()
-    db.refresh(nuevo)
-
-    # ────────────── 🔔 Notificación por correo + ALERTA ──────────────
-    try:
-        # 1) Importación (para el código)
-        codigo_importacion = imp.codigo if imp.codigo else str(data.importacionId)
-
-        # 2) Empleado encargado (para el mensaje)
-        empleado_encargado = (
-            db.query(Empleado)
-            .filter(Empleado.id == data.idEmpleadoEncargado)
+    # 🔹 PRODUCTO
+    if mov.productoId:
+        prod = (
+            db.query(Producto)
+            .filter(Producto.id == mov.productoId)  # 👈 SIN filtro por estado
             .first()
         )
-        nombre_encargado = (
-            f"{empleado_encargado.nombre} {empleado_encargado.apellido}"
-            if empleado_encargado
-            else None
-        )
+        mov.producto = prod
 
-        # 3) Admin activo (en tu caso Carlos)
-        admin = (
-            db.query(Empleado)
-            .filter(
-                Empleado.rol.in_(["ADMIN", "Administrador"]),
-                Empleado.estado == 1,
-            )
-            .first()
-        )
-
-        if admin:
-            # 3.1 correo
-            if admin.correo:
-                enviar_notificacion_movimiento(
-                    correo_admin=admin.correo,
-                    codigo_importacion=codigo_importacion,
-                    tipo_movimiento=nuevo.tipoMovimiento,
-                    descripcion=nuevo.descripcion,
-                    empleado_encargado=nombre_encargado,
-                )
-
-            # 3.2 alerta en BD
-            mensaje_alerta = (
-                f"Nuevo movimiento {nuevo.tipoMovimiento} en importación "
-                f"{codigo_importacion} (encargado: {nombre_encargado or 'N/D'})."
-            )
-
-            alerta = Alerta(
-                tipo="MOV_IMPORTACION",
-                mensaje=mensaje_alerta,
-                empleadoId=admin.id,       # 👈 aquí se guarda el 1 (Carlos)
-                fecha=datetime.utcnow(),
-            )
-            db.add(alerta)
-            db.commit()
-
-            print("✅ Alerta de movimiento creada para empleadoId =", admin.id)
+        if prod:
+            mov.productoSerie = prod.numeroSerie
+            mov.productoDescripcion = prod.descripcion
+            mov.productoObservado = prod.observado
+            mov.productoObsDescripcion = prod.obsDescripcion
         else:
-            print("⚠️ No se encontró administrador activo para crear alerta.")
+            mov.productoSerie = None
+            mov.productoDescripcion = None
+            mov.productoObservado = None
+            mov.productoObsDescripcion = None
 
-    except Exception as e:
-        # No romper el flujo si falla
-        print(f"❌ Error al procesar notificación/alerta de movimiento: {e}")
+        # 🔹 MODELO
+        if prod and prod.modeloId:
+            modelo = (
+                db.query(ModeloProducto)
+                .filter(ModeloProducto.id == prod.modeloId)
+                .first()
+            )
+            mov.modeloProducto = modelo
+        else:
+            mov.modeloProducto = None
 
-    # 4) Recalcular estado de la importación (puede pasar a estado = 2)
-    try:
-        _recalcular_estado_importacion(db, data.importacionId)
-    except Exception as e:
-        print(f"⚠️ No se pudo recalcular estado de importación: {e}")
+        # 🔹 CATEGORÍA
+        if prod and prod.categoriaId:
+            categoria = (
+                db.query(Categoria)
+                .filter(Categoria.id == prod.categoriaId)
+                .first()
+            )
+            mov.categoria = categoria
+        else:
+            mov.categoria = None
 
-    return nuevo
+        # 🔹 IMPORTACIÓN
+        if prod and prod.importacionId:
+            imp = (
+                db.query(Importacion)
+                .filter(Importacion.id == prod.importacionId)
+                .first()
+            )
+            mov.importacion = imp
+        else:
+            mov.importacion = None
 
+    else:
+        mov.producto = None
+        mov.productoSerie = None
+        mov.productoDescripcion = None
+        mov.productoObservado = None
+        mov.productoObsDescripcion = None
+        mov.modeloProducto = None
+        mov.categoria = None
+        mov.importacion = None
 
-# 📍 Listar TODOS los movimientos
-def listar_movimientos_importacion(db: Session) -> List[MovimientoImportacion]:
-    return db.query(MovimientoImportacion).all()
+    # 🔹 ALMACÉN
+    if mov.almacenId:
+        a = db.query(Almacen).filter(Almacen.id == mov.almacenId).first()
+        mov.almacen = a
+        mov.almacenNombre = a.nombre if a else None
+    else:
+        mov.almacen = None
+        mov.almacenNombre = None
 
+    return mov
 
-# 📍 Obtener movimiento por ID
-def obtener_movimiento_importacion(
+# ----------------------------------------------------
+# 🔸 LISTAR SOLO MOVIMIENTOS ACTIVOS
+# ----------------------------------------------------
+def listar_movimientos(
     db: Session,
-    movimiento_id: int,
-) -> MovimientoImportacion:
-    movimiento = db.query(MovimientoImportacion).filter_by(id=movimiento_id).first()
-    if not movimiento:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Movimiento de importación no encontrado",
-        )
-    return movimiento
-
-
-# 📍 Actualizar movimiento
-def actualizar_movimiento_importacion(
-    db: Session,
-    movimiento_id: int,
-    data: MovimientoImportacionUpdate,
-) -> MovimientoImportacion:
-    movimiento = db.query(MovimientoImportacion).filter_by(id=movimiento_id).first()
-    if not movimiento:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Movimiento de importación no encontrado",
-        )
-
-    update_data = data.dict(exclude_unset=True)
-
-    # si viene tipoMovimiento, también lo normalizamos a MAYÚSCULAS
-    if "tipoMovimiento" in update_data and update_data["tipoMovimiento"] is not None:
-        update_data["tipoMovimiento"] = (
-            update_data["tipoMovimiento"].upper().strip()
-        )
-
-    for field, value in update_data.items():
-        setattr(movimiento, field, value)
-
-    db.commit()
-    db.refresh(movimiento)
-    return movimiento
-
-
-# 📍 Eliminar movimiento
-def eliminar_movimiento_importacion(
-    db: Session,
-    movimiento_id: int,
-) -> None:
-    movimiento = db.query(MovimientoImportacion).filter_by(id=movimiento_id).first()
-    if not movimiento:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Movimiento de importación no encontrado",
-        )
-
-    db.delete(movimiento)
-    db.commit()
-
-
-# 📍 Listar movimientos de UNA importación
-def listar_por_importacion(
-    db: Session,
-    importacion_id: int,
-) -> List[MovimientoImportacion]:
-    """
-    Devuelve todos los movimientos de una importación concreta,
-    ordenados por fechaRegistro ASC.
-    """
-    return (
-        db.query(MovimientoImportacion)
-        .filter(MovimientoImportacion.importacionId == importacion_id)
-        .order_by(MovimientoImportacion.fechaRegistro.asc())
-        .all()
+    usuario_id: Optional[int] = None,
+    almacen_id: Optional[int] = None,
+):
+    query = db.query(MovimientoInventario).filter(
+        MovimientoInventario.estado == 1  # 👈 solo activos
     )
 
+    # 👇 si viene usuario_id, filtramos por el usuario que realizó el movimiento
+    if usuario_id is not None:
+        query = query.filter(MovimientoInventario.usuarioId == usuario_id)
 
-# 📍 Obtener "estado" de los movimientos de una importación
-def obtener_estado_movimientos(
-    db: Session,
-    importacion_id: int,
-) -> List[MovimientoEstadoOut]:
-    """
-    Devuelve para CADA PASO:
-      - code (ej: PEDIDO)
-      - label (ej: Pedido confirmado)
-      - completado: True/False
-      - movimiento: datos del movimiento si existe, o None
+    # 👇 si viene almacen_id, filtramos por almacén
+    if almacen_id is not None:
+        query = query.filter(MovimientoInventario.almacenId == almacen_id)
 
-    Esto es lo que usa el front para pintar los círculos en verde/rojo
-    y mostrar detalle cuando hacen click.
-    """
-    # 1) Traemos todos los movimientos de esa importación
-    movimientos = listar_por_importacion(db, importacion_id)
+    movs = query.order_by(MovimientoInventario.fecha.desc()).all()
 
-    # 2) Conjunto de tipos presentes, en MAYÚSCULAS
-    tipos_presentes = {
-        (m.tipoMovimiento or "").upper() for m in movimientos
-    }
+    for m in movs:
+        _adjuntar_extras(db, m)
 
-    resultado: List[MovimientoEstadoOut] = []
-
-    for paso in PASOS:
-        code = paso["code"]
-        label = paso["label"]
-        completado = code in tipos_presentes
-
-        movimiento_out = None
-        if completado:
-            # buscamos el movimiento correspondiente a ese tipo
-            mov = next(
-                (m for m in movimientos if (m.tipoMovimiento or "").upper() == code),
-                None,
-            )
-            if mov is not None:
-                movimiento_out = MovimientoImportacionOut.from_orm(mov)
-
-        resultado.append(
-            MovimientoEstadoOut(
-                code=code,
-                label=label,
-                completado=completado,
-                movimiento=movimiento_out,
-            )
+    return movs
+# ----------------------------------------------------
+# 🔸 OBTENER MOVIMIENTO (solo si activo)
+# ----------------------------------------------------
+def obtener_movimiento(db: Session, movimiento_id: int):
+    mov = (
+        db.query(MovimientoInventario)
+        .filter(
+            MovimientoInventario.id == movimiento_id,
+            MovimientoInventario.estado == 1,  # 👈 solo activos
         )
+        .first()
+    )
+    if not mov:
+        raise HTTPException(status_code=404, detail="Movimiento no encontrado")
 
-    return resultado
+    _adjuntar_extras(db, mov)
+    return mov
+
+
+# ----------------------------------------------------
+# 🔸 CREAR MOVIMIENTO
+# ----------------------------------------------------
+def crear_movimiento(
+    db: Session,
+    payload: MovimientoCreate,
+    usuario_id: int | None = None,
+):
+    prod = db.query(Producto).get(payload.productoId)
+    if not prod:
+        raise HTTPException(status_code=404, detail="Producto no existe")
+
+    mov = MovimientoInventario(
+        productoId=payload.productoId,
+        almacenId=payload.almacenId,
+        tipoMovimiento=payload.tipoMovimiento,
+        usuarioId=usuario_id,
+        estado=1,  # 👈 activo por defecto
+    )
+    db.add(mov)
+
+    # Ajuste de stockActual
+    if prod.modeloId:
+        mp = db.query(ModeloProducto).get(prod.modeloId)
+        if mp:
+            if payload.tipoMovimiento == "ENTRADA":
+                mp.stockActual = (mp.stockActual or 0) + 1
+            elif payload.tipoMovimiento == "SALIDA":
+                nuevo = (mp.stockActual or 0) - 1
+                mp.stockActual = nuevo if nuevo >= 0 else 0
+
+    db.commit()
+    db.refresh(mov)
+
+    _adjuntar_extras(db, mov)
+    return mov
+
+
+# ----------------------------------------------------
+# 🔸 ACTUALIZAR MOVIMIENTO
+# ----------------------------------------------------
+def actualizar_movimiento(
+    db: Session,
+    movimiento_id: int,
+    payload: MovimientoUpdate,
+    usuario_id: int | None = None,
+):
+    mov = (
+        db.query(MovimientoInventario)
+        .filter(
+            MovimientoInventario.id == movimiento_id,
+            MovimientoInventario.estado == 1,  # 👈 solo activos
+        )
+        .first()
+    )
+    if not mov:
+        raise HTTPException(status_code=404, detail="Movimiento no encontrado")
+
+    if payload.productoId is not None:
+        prod = db.query(Producto).get(payload.productoId)
+        if not prod:
+            raise HTTPException(status_code=404, detail="Producto no existe")
+        mov.productoId = payload.productoId
+
+    if payload.almacenId is not None:
+        mov.almacenId = payload.almacenId
+
+    if payload.tipoMovimiento is not None:
+        mov.tipoMovimiento = payload.tipoMovimiento
+
+    if usuario_id is not None:
+        mov.usuarioId = usuario_id
+
+    db.commit()
+    db.refresh(mov)
+
+    _adjuntar_extras(db, mov)
+    return mov
+
+
+# ----------------------------------------------------
+# 🔸 "ELIMINAR" MOVIMIENTO = MARCAR INACTIVO
+# ----------------------------------------------------
+def eliminar_movimiento(db: Session, movimiento_id: int):
+    mov = db.query(MovimientoInventario).get(movimiento_id)
+    if not mov:
+        raise HTTPException(status_code=404, detail="Movimiento no encontrado")
+
+    # en vez de borrar, solo marcamos como inactivo
+    mov.estado = 0
+    db.commit()
+    return {"detail": "Movimiento marcado como inactivo"}

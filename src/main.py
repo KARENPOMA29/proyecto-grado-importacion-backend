@@ -1,7 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from src.routers import empleado_router, cliente_router, proveedor_router, categoria_router, modelo_producto_router, sucursal_router, almacen_router, seccion_router, auth_router, importacion_router, movimiento_router, producto_router, venta_router, movimiento_importacion_router, reportes_router ,ciudad_router, marca_router, alerta_router
+from src.routers import empleado_router, cliente_router, proveedor_router, categoria_router, modelo_producto_router, sucursal_router, almacen_router, seccion_router, auth_router, importacion_router, movimiento_router, producto_router, venta_router, movimiento_importacion_router ,ciudad_router, marca_router, alerta_router
+from src.controllers.Reportes import reporte_ventas, reporte_inventario  # 👈 AQUI
 from src.config.db import Base, engine
 from src.config.paths import EMPLEADOS_DIR
 from fastapi.staticfiles import StaticFiles
@@ -43,7 +44,8 @@ app.include_router(movimiento_router.router)
 app.include_router(producto_router.router)
 app.include_router(venta_router.router)
 app.include_router(movimiento_importacion_router.router)
-app.include_router(reportes_router.router)
+app.include_router(reporte_ventas.router)
+app.include_router(reporte_inventario.router)
 app.include_router(ciudad_router.router)
 app.include_router(marca_router.router)
 app.include_router(alerta_router.router)
