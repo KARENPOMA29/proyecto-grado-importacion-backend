@@ -26,4 +26,4 @@ class SucursalResponse(SucursalBase):
     ciudadNombre: Optional[str] = None   # 🔥 Front recibe esto
 
     class Config:
-        orm_mode = True
+        from_attributes = True

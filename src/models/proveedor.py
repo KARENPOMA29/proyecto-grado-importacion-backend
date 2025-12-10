@@ -1,6 +1,7 @@
 from sqlalchemy import Column, Integer, String, DateTime
 from datetime import datetime
 from src.config.db import Base
+from sqlalchemy.orm import relationship
 
 class Proveedor(Base):
     __tablename__ = "Proveedor"
@@ -13,3 +14,5 @@ class Proveedor(Base):
     ci = Column(String(50), nullable=False)
     fechaRegistro = Column(DateTime, default=datetime.utcnow)
     estado = Column(Integer, default=1)  # 1 = activo, 0 = eliminado
+
+    importaciones = relationship("Importacion", back_populates="proveedor")

@@ -8,7 +8,7 @@ class AlmacenOut(BaseModel):
     nombre: Optional[str] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # Base
 class AlmacenBase(BaseModel):
@@ -34,4 +34,4 @@ class AlmacenResponse(AlmacenBase):
     sucursalNombre: Optional[str] = None  # 👈 viene del @property del modelo
 
     class Config:
-        orm_mode = True
+        from_attributes = True

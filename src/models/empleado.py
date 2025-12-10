@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey
 from datetime import datetime
 from src.config.db import Base
-
+from sqlalchemy.orm import relationship
 class Empleado(Base):
     __tablename__ = "Empleado"
 
@@ -19,3 +19,9 @@ class Empleado(Base):
     estado = Column(Integer, default=1)
     correo = Column(String(100))
     idSucursal = Column(Integer, ForeignKey("Sucursal.id"), nullable=True)
+
+    importaciones_asignadas = relationship(
+        "Importacion",
+        back_populates="empleadoAsignado",
+        foreign_keys="Importacion.idEmpleadoAsignado",
+    )

@@ -39,12 +39,41 @@ def crear_producto(producto: ProductoCreate, db: Session = Depends(get_db)):
 # -------------------------------------------------------------------
 @router.get("/", response_model=List[ProductoOut])
 def listar_productos(
-    estado: Optional[int] = Query(1, description="Estado del producto (0, 1, 2). Por defecto 1 = disponible"),
+    estado: Optional[int] = Query(
+        1,
+        description="Estado del producto (0, 1, 2). Por defecto 1 = disponible",
+    ),
+    observado: Optional[int] = Query(
+        None,
+        description="1 = normal, 2 = observado",
+    ),
+    categoriaId: Optional[int] = Query(
+        None,
+        description="ID de categoría",
+    ),
+    modeloId: Optional[int] = Query(
+        None,
+        description="ID de modelo",
+    ),
+    importacionId: Optional[int] = Query(
+        None,
+        description="ID de importación",
+    ),
+    numeroSerie: Optional[str] = Query(
+        None,
+        description="Búsqueda parcial por número de serie",
+    ),
     db: Session = Depends(get_db),
 ):
-    return controller.listar_productos(db, estado=estado)
-
-
+    return controller.listar_productos(
+        db,
+        estado=estado,
+        observado=observado,
+        categoriaId=categoriaId,
+        modeloId=modeloId,
+        importacionId=importacionId,
+        numeroSerie=numeroSerie,
+    )
 # -------------------------------------------------------------------
 # GET /productos/{id} -> obtener por ID (solo activos)
 # -------------------------------------------------------------------

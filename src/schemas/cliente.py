@@ -27,4 +27,4 @@ class ClienteResponse(ClienteBase):
     estado: int
 
     # Pydantic v2
-    model_config = ConfigDict(orm_mode=True)
+    model_config = ConfigDict(from_attributes=True)

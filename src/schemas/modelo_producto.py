@@ -9,7 +9,7 @@ class MarcaOut(BaseModel):
     nombre: str   # 👈 en minúscula, igual que el modelo SQLAlchemy
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 # Para combos / selects cortos
@@ -18,7 +18,7 @@ class ModeloProductoOut(BaseModel):
     nombreModelo: Optional[str] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 # -------- BASE --------
@@ -64,4 +64,4 @@ class ModeloProductoResponse(ModeloProductoBase):
     marca: Optional[MarcaOut] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True

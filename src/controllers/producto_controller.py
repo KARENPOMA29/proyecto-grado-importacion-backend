@@ -57,12 +57,38 @@ def obtener_producto_por_serie(db: Session, numero_serie: str):
 #   estado = 0 -> inactivos
 #   estado = None -> todos
 # -------------------------------------------------------------------
-def listar_productos(db: Session, estado: Optional[int] = 1):
+def listar_productos(
+    db: Session,
+    estado: Optional[int] = 1,
+    observado: Optional[int] = None,
+    categoriaId: Optional[int] = None,
+    modeloId: Optional[int] = None,
+    importacionId: Optional[int] = None,
+    numeroSerie: Optional[str] = None,
+):
     query = db.query(Producto)
+
     if estado is not None:
         query = query.filter(Producto.estado == estado)
-    return query.all()
 
+    if observado is not None:
+        query = query.filter(Producto.observado == observado)
+
+    if categoriaId is not None:
+        query = query.filter(Producto.categoriaId == categoriaId)
+
+    if modeloId is not None:
+        query = query.filter(Producto.modeloId == modeloId)
+
+    if importacionId is not None:
+        query = query.filter(Producto.importacionId == importacionId)
+
+    if numeroSerie:
+        # búsqueda parcial (contiene)
+        like_pattern = f"%{numeroSerie}%"
+        query = query.filter(Producto.numeroSerie.ilike(like_pattern))
+
+    return query.all()
 
 # -------------------------------------------------------------------
 # OBTENER PRODUCTO POR ID (solo activos)

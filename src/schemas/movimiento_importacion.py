@@ -28,7 +28,7 @@ class MovimientoImportacionResponse(MovimientoImportacionBase):
     fechaRegistro: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class PasoMovimientoOut(BaseModel):
@@ -38,7 +38,7 @@ class PasoMovimientoOut(BaseModel):
     movimiento: Optional[MovimientoImportacionResponse] = None  # reutilizamos el response
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class MovimientoImportacionOut(BaseModel):
@@ -51,7 +51,7 @@ class MovimientoImportacionOut(BaseModel):
     fechaRegistro: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # src/schemas/movimiento_importacion.py
 class MovimientoImportacionOut(BaseModel):
@@ -67,7 +67,7 @@ class MovimientoImportacionOut(BaseModel):
     empleadoNombre: Optional[str] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class MovimientoEstadoOut(BaseModel):

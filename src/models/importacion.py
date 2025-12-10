@@ -16,3 +16,10 @@ class Importacion(Base):
     empleadoId = Column(Integer, nullable=False)
     fechaLlegada = Column(Date, nullable=False)
     idEmpleadoAsignado = Column(Integer, ForeignKey("Empleado.id"), nullable=False)
+
+    proveedor = relationship("Proveedor", back_populates="importaciones")
+    empleadoAsignado = relationship(
+        "Empleado",
+        foreign_keys=[idEmpleadoAsignado],
+        back_populates="importaciones_asignadas",
+    )

@@ -49,4 +49,4 @@ class MovimientoOut(MovimientoBase):
     productoObsDescripcion: Optional[str] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True

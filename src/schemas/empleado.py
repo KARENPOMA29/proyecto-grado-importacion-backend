@@ -43,4 +43,4 @@ class EmpleadoResponse(EmpleadoBase):
     estado: int
 
     class Config:
-        orm_mode = True  # FastAPI puede convertir desde SQLAlchemy
+        from_attributes = True  # FastAPI puede convertir desde SQLAlchemy
