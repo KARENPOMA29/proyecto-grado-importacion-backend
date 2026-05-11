@@ -1,7 +1,7 @@
 import shutil
-from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
 from sqlalchemy.orm import Session
-from typing import List
+from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Query
+from typing import Optional
 from pathlib import Path
 
 from src.config.db import SessionLocal
@@ -56,10 +56,22 @@ def crear_modelo(modelo: ModeloProductoCreate, db: Session = Depends(get_db)):
 
 
 # 📍 Listar modelos activos
-@router.get("/", response_model=List[ModeloProductoResponse])
-def listar_modelos(db: Session = Depends(get_db)):
-    return modelo_producto_controller.listar_modelos(db)
-
+#@router.get("/", response_model=List[ModeloProductoResponse])
+#def listar_modelos(db: Session = Depends(get_db)):
+#    return modelo_producto_controller.listar_modelos(db)
+@router.get("/")
+def listar_modelos(
+    search: Optional[str] = Query(None),
+    page: int = Query(1, ge=1),
+    pageSize: int = Query(10, ge=1),
+    db: Session = Depends(get_db),
+):
+    return modelo_producto_controller.listar_modelos(
+        db=db,
+        search=search,
+        page=page,
+        pageSize=pageSize,
+    )
 
 # 📍 Obtener modelo por ID
 @router.get("/{modelo_id}", response_model=ModeloProductoResponse)

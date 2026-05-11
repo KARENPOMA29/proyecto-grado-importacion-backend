@@ -14,7 +14,7 @@ class ImportacionBase(BaseModel):
 class ProveedorMini(BaseModel):
     id: int
     razonSocial: str
-
+    encargado: Optional[str] = None
     model_config = ConfigDict(from_attributes=True)
 
 class EmpleadoMini(BaseModel):

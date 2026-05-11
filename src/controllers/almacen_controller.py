@@ -39,14 +39,56 @@ def crear_almacen(db: Session, almacen: AlmacenCreate):
 
 
 # ✅ Listar almacenes (opcionalmente filtrados por sucursal)
-def listar_almacenes(db: Session, sucursal_id: Optional[int] = None):
+def listar_almacenes(
+    db: Session,
+    sucursal_id: Optional[int] = None,
+    search: Optional[str] = None,
+    page: int = 1,
+    pageSize: int = 10
+):
     query = db.query(Almacen).filter(Almacen.estado == 1)
 
     if sucursal_id is not None:
         query = query.filter(Almacen.sucursalId == sucursal_id)
 
-    return query.all()
+    if search and search.strip():
+        texto = f"%{search.strip()}%"
+        query = query.join(Sucursal, Almacen.sucursalId == Sucursal.id).filter(
+            (Almacen.nombre.ilike(texto)) |
+            (Almacen.direccion.ilike(texto)) |
+            (Sucursal.nombre.ilike(texto))
+        )
 
+    total = query.count()
+
+    items = (
+        query
+        .order_by(Almacen.id.desc())
+        .offset((page - 1) * pageSize)
+        .limit(pageSize)
+        .all()
+    )
+
+    return {
+        "items": items,
+        "total": total,
+    }
+
+def combo_almacenes(db: Session):
+    almacenes = (
+        db.query(Almacen)
+        .filter(Almacen.estado == 1)
+        .order_by(Almacen.nombre.asc())
+        .all()
+    )
+
+    return [
+        {
+            "id": a.id,
+            "nombre": a.nombre,
+        }
+        for a in almacenes
+    ]
 
 # Obtener almacén por ID
 def obtener_almacen(db: Session, almacen_id: int):

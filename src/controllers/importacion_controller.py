@@ -1,11 +1,13 @@
 # src/controllers/importacion_controller.py
 
+from re import search
 from typing import Dict, Any, List
 from datetime import datetime
-
+from sqlalchemy import or_, func, String
+from src.models.proveedor import Proveedor
+from src.models.empleado import Empleado
 from fastapi import HTTPException
-from sqlalchemy.orm import Session
-
+from sqlalchemy.orm import Session, joinedload
 from src.models.producto import Producto
 from src.models.importacion import Importacion
 from src.schemas.importacion import (
@@ -14,6 +16,51 @@ from src.schemas.importacion import (
     ImportacionOut,
 )
 
+from sqlalchemy import or_, func
+from src.models.vw_control_importaciones import VwControlImportaciones
+def listar_control_importaciones(
+    db: Session,
+    search: str = "",
+    situacion: str | None = None,
+    page: int = 1,
+    pageSize: int = 10,
+):
+    query = db.query(VwControlImportaciones)
+
+    if search:
+        term = f"%{search.lower()}%"
+
+        query = query.filter(
+            or_(
+                func.lower(VwControlImportaciones.codigo).like(term),
+                func.lower(VwControlImportaciones.proveedorNombre).like(term),
+                func.lower(VwControlImportaciones.proveedorEncargado).like(term),
+                func.lower(VwControlImportaciones.empleadoAsignadoNombre).like(term),
+                func.lower(VwControlImportaciones.situacion).like(term),
+            )
+        )
+
+    if situacion:
+        query = query.filter(
+            VwControlImportaciones.situacion == situacion
+        )
+
+    total = query.count()
+
+    items = (
+        query
+        .order_by(
+            VwControlImportaciones.fechaLlegada.asc()
+        )
+        .offset((page - 1) * pageSize)
+        .limit(pageSize)
+        .all()
+    )
+
+    return {
+        "items": items,
+        "total": total,
+    }
 
 def listar_importaciones_por_empleado(
     db: Session,
@@ -69,34 +116,87 @@ def crear_importacion(db: Session, payload: ImportacionCreate) -> Importacion:
     return obj
 
 
-def listar_importaciones(db: Session) -> list[Importacion]:
-    """
-    Lista todas las importaciones con estado 1 (activa) o 2 (concluida).
-    Excluye solo las eliminadas (estado = 0).
-    """
-    return (
+
+def listar_importaciones(
+    db: Session,
+    search: str | None = None,
+    page: int = 1,
+    pageSize: int = 10,
+):
+    query = (
         db.query(Importacion)
+        .options(
+            joinedload(Importacion.proveedor),
+            joinedload(Importacion.empleadoAsignado),
+        )
         .filter(Importacion.estado != 0)
+    )
+
+    if search and search.strip():
+        term = f"%{search.strip().lower()}%"
+
+        query = (
+            query
+            .join(Proveedor, Importacion.proveedorId == Proveedor.id)
+            .join(Empleado, Importacion.idEmpleadoAsignado == Empleado.id)
+            .filter(
+                or_(
+                    func.lower(Importacion.codigo).like(term),
+                    func.lower(Importacion.descripcion).like(term),
+
+                    # proveedor
+                    func.lower(Proveedor.razonSocial).like(term),
+
+                    # empleado
+                    func.lower(Empleado.nombre).like(term),
+                    func.lower(Empleado.apellido).like(term),
+                    func.lower(
+                        func.concat(Empleado.nombre, " ", Empleado.apellido)
+                    ).like(term),
+
+                    # fecha
+                    func.cast(Importacion.fechaLlegada, String).like(term),
+                )
+            )
+        )
+
+    total = query.count()
+
+    items = (
+        query
+        .order_by(Importacion.id.desc())
+        .offset((page - 1) * pageSize)
+        .limit(pageSize)
         .all()
     )
 
+    return {
+        "items": items,
+        "total": total,
+    }
+
 
 def obtener_importacion(db: Session, importacion_id: int) -> Importacion:
-    """
-    Obtiene una importación NO eliminada por su ID (estado != 0).
-    """
     obj = (
         db.query(Importacion)
+        .options(
+            joinedload(Importacion.proveedor),
+            joinedload(Importacion.empleadoAsignado),
+        )
         .filter(
             Importacion.id == importacion_id,
             Importacion.estado != 0,
         )
         .first()
     )
-    if not obj:
-        raise HTTPException(status_code=404, detail="Importación no encontrada o inactiva")
-    return obj
 
+    if not obj:
+        raise HTTPException(
+            status_code=404,
+            detail="Importación no encontrada o inactiva"
+        )
+
+    return obj
 
 def actualizar_importacion(
     db: Session, importacion_id: int, payload: ImportacionUpdate

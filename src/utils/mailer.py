@@ -1,19 +1,15 @@
-# src/utils/email_utils.py
 import os
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
-# 📧 Configuración SMTP
-SMTP_USER = os.getenv("SMTP_USER", "karendocu6707@gmail.com")
-SMTP_PASS = os.getenv("SMTP_PASS", "pjdmamzpixtgyyrn")  # contraseña de aplicación
+SMTP_USER = os.getenv("SMTP_USER", "karencitarosaura8@gmail.com")
+SMTP_PASS = os.getenv("SMTP_PASS", "qpxlqdazhcaeyoia")  # sin espacios
 SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
-SMTP_PORT = int(os.getenv("SMTP_PORT", 587))
+SMTP_PORT = int(os.getenv("SMTP_PORT", 465))
 
 
 def _enviar_correo(destinatario: str, asunto: str, cuerpo: str) -> bool:
-    """Función interna para enviar correos de texto plano."""
-    # Si estamos en entorno de test, no enviamos correos reales
     if os.getenv("TESTING") == "1":
         print(f"[TESTING] No se envía correo real. Destino: {destinatario}")
         print(cuerpo)
@@ -26,8 +22,7 @@ def _enviar_correo(destinatario: str, asunto: str, cuerpo: str) -> bool:
     msg.attach(MIMEText(cuerpo, "plain", "utf-8"))
 
     try:
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
-            server.starttls()
+        with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, timeout=30) as server:
             server.login(SMTP_USER, SMTP_PASS)
             server.send_message(msg)
 
@@ -37,8 +32,6 @@ def _enviar_correo(destinatario: str, asunto: str, cuerpo: str) -> bool:
     except Exception as e:
         print(f"❌ Error enviando correo a {destinatario}: {e}")
         return False
-
-
 def enviar_credenciales(destino: str, usuario: str, password_plano: str) -> bool:
     asunto = "IMPORT SYSTEM - Credenciales de acceso"
     cuerpo = f"""
@@ -105,3 +98,38 @@ def enviar_notificacion_movimiento(
     """
 
     return _enviar_correo(correo_admin, asunto, cuerpo.strip())
+
+def enviar_notificacion_importacion_concluida(
+    correo_admin,
+    codigo_importacion,
+    descripcion,
+    fecha_llegada,
+    movimientos,
+):
+    asunto = f"IMPORT SYSTEM - Importación concluida: {codigo_importacion}"
+
+    cuerpo = f"""
+Estimado Administrador,
+
+La importación {codigo_importacion} ha concluido correctamente.
+
+DATOS DE LA IMPORTACIÓN
+Código: {codigo_importacion}
+Descripción: {descripcion or 'Sin descripción'}
+Fecha de llegada: {fecha_llegada or 'No registrada'}
+Estado: Concluida
+
+MOVIMIENTOS REGISTRADOS
+{movimientos}
+
+El sistema cambió automáticamente el estado de la importación a CONCLUIDA.
+
+Saludos,
+Sistema de Gestión de Importaciones
+"""
+
+    return _enviar_correo(
+        destinatario=correo_admin,
+        asunto=asunto,
+        cuerpo=cuerpo.strip(),
+    )

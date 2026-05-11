@@ -1,6 +1,7 @@
 from datetime import datetime
 from fastapi import HTTPException
 from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import or_
 from src.models.modelo_producto import ModeloProducto
 from src.models.producto import Producto
 from src.models.seccion import Seccion
@@ -68,13 +69,42 @@ def crear_modelo(db: Session, modelo: ModeloProductoCreate):
 
 
 # 📍 Listar modelos activos
-def listar_modelos(db: Session):
-    return (
+from sqlalchemy import or_
+
+def listar_modelos(db: Session, search: str = None, page: int = 1, pageSize: int = 10):
+    query = (
         db.query(ModeloProducto)
-        .options(joinedload(ModeloProducto.marca))  # 👈 importante
+        .options(joinedload(ModeloProducto.marca))
         .filter(ModeloProducto.estado == 1)
+    )
+
+    if search and search.strip():
+        texto = f"%{search.strip()}%"
+
+        query = query.outerjoin(Marca).filter(
+            or_(
+                ModeloProducto.nombreModelo.ilike(texto),
+                ModeloProducto.color.ilike(texto),
+                ModeloProducto.capacidadOTamano.ilike(texto),
+                ModeloProducto.unidadMedida.ilike(texto),
+                Marca.nombre.ilike(texto),
+            )
+        )
+
+    total = query.count()
+
+    items = (
+        query
+        .order_by(ModeloProducto.id.desc())
+        .offset((page - 1) * pageSize)
+        .limit(pageSize)
         .all()
     )
+
+    return {
+        "items": items,
+        "total": total,
+    }
 
 
 # 📍 Obtener modelo por ID

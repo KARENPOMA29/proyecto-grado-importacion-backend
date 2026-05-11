@@ -3,7 +3,7 @@ from fastapi import HTTPException
 from src.models.cliente import Cliente
 from src.schemas.cliente import ClienteCreate, ClienteUpdate
 from src.models.venta import Venta
-
+from sqlalchemy import or_
 
 # Crear cliente
 def crear_cliente(db: Session, cliente: ClienteCreate):
@@ -64,9 +64,38 @@ def crear_cliente(db: Session, cliente: ClienteCreate):
 
 
 # Listar todos los clientes activos
-def listar_clientes(db: Session):
-    return db.query(Cliente).filter(Cliente.estado == 1).all()
+#def listar_clientes(db: Session):
+#   return db.query(Cliente).filter(Cliente.estado == 1).all()
 
+
+def listar_clientes(db: Session, search: str = None, page: int = 1, pageSize: int = 10):
+    query = db.query(Cliente).filter(Cliente.estado == 1)
+
+    if search:
+        texto = f"%{search.strip()}%"
+        query = query.filter(
+            or_(
+                Cliente.razonSocial.ilike(texto),
+                Cliente.nit.ilike(texto),
+                Cliente.correo.ilike(texto),
+                Cliente.telefono.ilike(texto),
+            )
+        )
+
+    total = query.count()
+
+    items = (
+        query
+        .order_by(Cliente.razonSocial.asc())
+        .offset((page - 1) * pageSize)
+        .limit(pageSize)
+        .all()
+    )
+
+    return {
+        "items": items,
+        "total": total
+    }
 
 # Obtener cliente por ID (solo activos)
 def obtener_cliente(db: Session, cliente_id: int):

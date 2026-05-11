@@ -1,10 +1,11 @@
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy import or_
 from src.models.empleado import Empleado
 from src.schemas.empleado import EmpleadoCreate, EmpleadoUpdate
 from src.utils.security import md5_hash
 from src.utils.mailer import enviar_credenciales
-
+from src.models.sucursal import Sucursal
 
 def crear_empleado(db: Session, empleado: EmpleadoCreate):
     # Normalizamos strings
@@ -102,8 +103,45 @@ def crear_empleado(db: Session, empleado: EmpleadoCreate):
     return nuevo
 
 
-def listar_empleados(db: Session):
-    return db.query(Empleado).filter(Empleado.estado == 1).all()
+#def listar_empleados(db: Session):
+ #   return db.query(Empleado).filter(Empleado.estado == 1).all()
+def listar_empleados(db: Session, search: str = None, page: int = 1, pageSize: int = 10):
+    query = (
+        db.query(Empleado)
+        .outerjoin(Sucursal, Empleado.idSucursal == Sucursal.id)
+        .filter(Empleado.estado == 1)
+    )
+
+    if search:
+        texto = f"%{search.strip()}%"
+        query = query.filter(
+            or_(
+                Empleado.nombre.ilike(texto),
+                Empleado.apellido.ilike(texto),
+                Empleado.segundoApellido.ilike(texto),
+                Empleado.ci.ilike(texto),
+                Empleado.telefono.ilike(texto),
+                Empleado.rol.ilike(texto),
+                Empleado.usuario.ilike(texto),
+                Empleado.correo.ilike(texto),
+                Sucursal.nombre.ilike(texto),
+            )
+        )
+
+    total = query.count()
+
+    items = (
+        query
+        .order_by(Empleado.nombre.asc())
+        .offset((page - 1) * pageSize)
+        .limit(pageSize)
+        .all()
+    )
+
+    return {
+        "items": items,
+        "total": total
+    }
 
 
 def obtener_empleado_por_id(db: Session, empleado_id: int):

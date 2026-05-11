@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
+from typing import Optional
 from sqlalchemy.orm import Session
 from typing import List
 from src.config.db import SessionLocal
@@ -18,9 +19,18 @@ def get_db():
 def crear_proveedor(proveedor: ProveedorCreate, db: Session = Depends(get_db)):
     return proveedor_controller.crear_proveedor(db, proveedor)
 
-@router.get("/", response_model=List[ProveedorResponse])
-def listar_proveedores(db: Session = Depends(get_db)):
-    return proveedor_controller.listar_proveedores(db)
+#@router.get("/", response_model=List[ProveedorResponse])
+#def listar_proveedores(db: Session = Depends(get_db)):
+#    return proveedor_controller.listar_proveedores(db)
+
+@router.get("/")
+def listar_proveedores(
+    search: Optional[str] = Query(None),
+    page: int = Query(1, ge=1),
+    pageSize: int = Query(10, ge=1),
+    db: Session = Depends(get_db)
+):
+    return proveedor_controller.listar_proveedores(db, search, page, pageSize)
 
 @router.get("/{proveedor_id}", response_model=ProveedorResponse)
 def obtener_proveedor(proveedor_id: int, db: Session = Depends(get_db)):

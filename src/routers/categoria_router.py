@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 from src.config.db import SessionLocal
 from src.schemas.categoria import CategoriaCreate, CategoriaUpdate, CategoriaResponse
 from src.controllers import categoria_controller
@@ -18,9 +18,19 @@ def get_db():
 def crear_categoria(categoria: CategoriaCreate, db: Session = Depends(get_db)):
     return categoria_controller.crear_categoria(db, categoria)
 
-@router.get("/", response_model=List[CategoriaResponse])
-def listar_categorias(db: Session = Depends(get_db)):
-    return categoria_controller.listar_categorias(db)
+@router.get("/")
+def listar_categorias(
+    search: Optional[str] = None,
+    page: int = 1,
+    pageSize: int = 10,
+    db: Session = Depends(get_db)
+):
+    return categoria_controller.listar_categorias(
+        db=db,
+        search=search,
+        page=page,
+        pageSize=pageSize
+    )
 
 @router.get("/{categoria_id}", response_model=CategoriaResponse)
 def obtener_categoria(categoria_id: int, db: Session = Depends(get_db)):

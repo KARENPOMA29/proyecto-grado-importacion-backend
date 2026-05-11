@@ -17,14 +17,26 @@ def get_db():
 
 
 # ✅ único GET para listar (filtra por sucursal si llega ?sucursalId=)
-@router.get("/", response_model=List[AlmacenResponse])
+@router.get("/")
 def listar_almacenes(
     sucursal_id: Optional[int] = Query(default=None, alias="sucursalId"),
+    search: Optional[str] = Query(default=None),
+    page: int = Query(default=1),
+    pageSize: int = Query(default=10),
     db: Session = Depends(get_db),
 ):
-    return almacen_controller.listar_almacenes(db, sucursal_id)
-
-
+    return almacen_controller.listar_almacenes(
+        db=db,
+        sucursal_id=sucursal_id,
+        search=search,
+        page=page,
+        pageSize=pageSize,
+    )
+@router.get("/combo")
+def combo_almacenes(
+    db: Session = Depends(get_db),
+):
+    return almacen_controller.combo_almacenes(db)
 @router.post("/", response_model=AlmacenResponse)
 def crear_almacen(almacen: AlmacenCreate, db: Session = Depends(get_db)):
     return almacen_controller.crear_almacen(db, almacen)

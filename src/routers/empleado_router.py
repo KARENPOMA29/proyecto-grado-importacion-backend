@@ -1,6 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, APIRouter, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
+from typing import Optional, List
 from sqlalchemy.orm import Session
-from typing import List
 from src.config.db import SessionLocal
 from src.controllers import empleado_controller
 from uuid import uuid4
@@ -10,6 +10,7 @@ from src.schemas.empleado import EmpleadoCreate, EmpleadoResponse, EmpleadoUpdat
 from src.config.paths import EMPLEADOS_DIR
     
 router = APIRouter(prefix="/empleados", tags=["Empleados"])
+
 
 def get_db():
     db = SessionLocal()
@@ -44,9 +45,18 @@ def crear_empleado(empleado: EmpleadoCreate, db: Session = Depends(get_db)):
     return empleado_controller.crear_empleado(db, empleado)
 
 # 📍 Listar empleados
-@router.get("/", response_model=List[EmpleadoResponse])
-def listar_empleados(db: Session = Depends(get_db)):
-    return empleado_controller.listar_empleados(db)
+#@router.get("/", response_model=List[EmpleadoResponse])
+#def listar_empleados(db: Session = Depends(get_db)):
+#    return empleado_controller.listar_empleados(db)
+
+@router.get("/")
+def listar_empleados(
+    search: Optional[str] = Query(None),
+    page: int = Query(1, ge=1),
+    pageSize: int = Query(10, ge=1),
+    db: Session = Depends(get_db)
+):
+    return empleado_controller.listar_empleados(db, search, page, pageSize)
 
 # 📍 Obtener empleado por ID
 @router.get("/{empleado_id}", response_model=EmpleadoResponse)

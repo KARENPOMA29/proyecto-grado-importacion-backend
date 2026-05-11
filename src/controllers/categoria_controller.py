@@ -20,8 +20,27 @@ def crear_categoria(db: Session, categoria: CategoriaCreate):
     return nueva
 
 # Listar categorías activas
-def listar_categorias(db: Session):
-    return db.query(Categoria).filter(Categoria.estado == 1).all()
+def listar_categorias(db: Session, search: str = None, page: int = 1, pageSize: int = 10):
+    query = db.query(Categoria).filter(Categoria.estado == 1)
+
+    if search and search.strip():
+        texto = f"%{search.strip()}%"
+        query = query.filter(Categoria.nombre.ilike(texto))
+
+    total = query.count()
+
+    items = (
+        query
+        .order_by(Categoria.id.desc())
+        .offset((page - 1) * pageSize)
+        .limit(pageSize)
+        .all()
+    )
+
+    return {
+        "items": items,
+        "total": total,
+    }
 
 # Obtener por ID
 def obtener_categoria(db: Session, categoria_id: int):

@@ -29,9 +29,30 @@ def listar_importaciones_por_empleado(
         db, empleado_id
     )
 
-@router.get("/", response_model=list[ImportacionOut])
-def listar_importaciones(db: Session = Depends(get_db)):
-    return importacion_controller.listar_importaciones(db)
+@router.get("/control")
+def listar_control_importaciones(
+    search: str | None = None,
+    situacion: str | None = None,
+    page: int = 1,
+    pageSize: int = 10,
+    db: Session = Depends(get_db),
+):
+    return importacion_controller.listar_control_importaciones(
+        db,
+        search,
+        situacion,
+        page,
+        pageSize,
+    )
+
+@router.get("/")
+def listar_importaciones(
+    search: str | None = None,
+    page: int = 1,
+    pageSize: int = 10,
+    db: Session = Depends(get_db),
+):
+    return importacion_controller.listar_importaciones(db, search, page, pageSize)
 
 
 @router.post("/", response_model=ImportacionOut)

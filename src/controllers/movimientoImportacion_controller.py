@@ -17,7 +17,10 @@ from src.schemas.movimiento_importacion import (
     MovimientoEstadoOut,
     
 )
-from src.utils.mailer import enviar_notificacion_movimiento
+from src.utils.mailer import (
+    enviar_notificacion_movimiento,
+    enviar_notificacion_importacion_concluida,
+)
 # 👇 mismo orden/códigos que en el front
 PASOS = [
     {"code": "PEDIDO", "label": "Pedido confirmado"},
@@ -30,6 +33,52 @@ PASOS = [
     {"code": "ENTREGADO", "label": "Entregado"},
 ]
 
+def verificar_y_concluir_importacion(db: Session, importacion_id: int):
+    movimientos = listar_por_importacion(db, importacion_id)
+
+    pasos_requeridos = {p["code"] for p in PASOS}
+    pasos_registrados = {
+        (m.tipoMovimiento or "").upper().strip()
+        for m in movimientos
+    }
+
+    if not pasos_requeridos.issubset(pasos_registrados):
+        return
+
+    importacion = db.query(Importacion).filter(Importacion.id == importacion_id).first()
+
+    if not importacion:
+        return
+
+    if int(importacion.estado or 0) == 2:
+        return
+
+    importacion.estado = 2
+    db.commit()
+    db.refresh(importacion)
+
+    admin = (
+        db.query(Empleado)
+        .filter(
+            Empleado.rol.in_(["ADMIN", "Administrador"]),
+            Empleado.estado == 1,
+        )
+        .first()
+    )
+
+    if admin and admin.correo:
+        resumen = "\n".join([
+            f"- {m.tipoMovimiento}: {m.descripcion or 'Sin descripción'}"
+            for m in movimientos
+        ])
+
+        enviar_notificacion_importacion_concluida(
+            correo_admin=admin.correo,
+            codigo_importacion=importacion.codigo,
+            descripcion=importacion.descripcion,
+            fecha_llegada=str(importacion.fechaLlegada),
+            movimientos=resumen,
+        )
 
 def crear_movimiento_importacion(
     db: Session,
@@ -114,6 +163,7 @@ def crear_movimiento_importacion(
     except Exception as e:
         # No romper el flujo si falla
         print(f"❌ Error al procesar notificación/alerta de movimiento: {e}")
+    verificar_y_concluir_importacion(db, data.importacionId)
 
     return nuevo
 
@@ -163,6 +213,7 @@ def actualizar_movimiento_importacion(
 
     db.commit()
     db.refresh(movimiento)
+    verificar_y_concluir_importacion(db, movimiento.importacionId)
     return movimiento
 
 

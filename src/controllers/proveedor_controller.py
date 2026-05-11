@@ -1,4 +1,5 @@
 from sqlalchemy.orm import Session
+from sqlalchemy import or_
 from fastapi import HTTPException
 from src.models.proveedor import Proveedor
 from src.schemas.proveedor import ProveedorCreate, ProveedorUpdate
@@ -20,9 +21,37 @@ def crear_proveedor(db: Session, proveedor: ProveedorCreate):
     return nuevo
 
 # Listar proveedores activos
-def listar_proveedores(db: Session):
-    return db.query(Proveedor).filter(Proveedor.estado == 1).all()
+#def listar_proveedores(db: Session):
+#    return db.query(Proveedor).filter(Proveedor.estado == 1).all()
+def listar_proveedores(db: Session, search: str = None, page: int = 1, pageSize: int = 10):
+    query = db.query(Proveedor).filter(Proveedor.estado == 1)
 
+    if search:
+        texto = f"%{search.strip()}%"
+        query = query.filter(
+            or_(
+                Proveedor.razonSocial.ilike(texto),
+                Proveedor.encargado.ilike(texto),
+                Proveedor.ci.ilike(texto),
+                Proveedor.telefono.ilike(texto),
+                Proveedor.direccion.ilike(texto),
+            )
+        )
+
+    total = query.count()
+
+    items = (
+        query
+        .order_by(Proveedor.razonSocial.asc())
+        .offset((page - 1) * pageSize)
+        .limit(pageSize)
+        .all()
+    )
+
+    return {
+        "items": items,
+        "total": total
+    }
 # Obtener proveedor por ID
 def obtener_proveedor(db: Session, proveedor_id: int):
     proveedor = db.query(Proveedor).filter(Proveedor.id == proveedor_id, Proveedor.estado == 1).first()
@@ -66,24 +95,28 @@ def actualizar_proveedor(db: Session, proveedor_id: int, datos: ProveedorUpdate)
 
 # Eliminación lógica
 def eliminar_proveedor(db: Session, proveedor_id: int):
-    proveedor = db.query(Proveedor).filter(Proveedor.id == proveedor_id, Proveedor.estado == 1).first()
-    if not proveedor:
-        raise HTTPException(status_code=404, detail="Proveedor no encontrado o ya eliminado")
+    proveedor = db.query(Proveedor).filter(
+        Proveedor.id == proveedor_id,
+        Proveedor.estado == 1
+    ).first()
 
-    # ⚠️ validar si tiene importaciones activas
-    importaciones_activas = db.query(Importacion).filter(
-        Importacion.proveedorId == proveedor_id,
-        # usa el campo que tengas: estado == "En aduana"/"En tránsito" o activo == 1
-        # si en tu tabla usas "activo" como en el JSON que me pasaste:
-        Importacion.activo == 1
+    if not proveedor:
+        raise HTTPException(
+            status_code=404,
+            detail="Proveedor no encontrado o ya eliminado"
+        )
+
+    importaciones_registradas = db.query(Importacion).filter(
+        Importacion.proveedorId == proveedor_id
     ).count()
 
-    if importaciones_activas > 0:
+    if importaciones_registradas > 0:
         raise HTTPException(
             status_code=400,
-            detail=f"No se puede eliminar el proveedor porque tiene {importaciones_activas} importación(es) activa(s)."
+            detail=f"No se puede eliminar el proveedor porque tiene {importaciones_registradas} importación(es) registrada(s)."
         )
 
     proveedor.estado = 0
     db.commit()
+
     return {"mensaje": "Proveedor eliminado correctamente (lógicamente)"}

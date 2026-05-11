@@ -6,7 +6,9 @@ from src.models.seccion import Seccion
 from src.models.almacen import Almacen
 from src.models.modelo_producto import ModeloProducto
 from src.schemas.seccion import SeccionCreate, SeccionUpdate
-
+from src.models.movimiento_inventario import MovimientoInventario
+from src.models.producto import Producto
+from sqlalchemy import text
 # Crear sección
 def crear_seccion(db: Session, seccion: SeccionCreate):
     # Validar que el almacén esté activo
@@ -117,16 +119,47 @@ def eliminar_seccion(db: Session, seccion_id: int):
         Seccion.id == seccion_id,
         Seccion.estado == 1
     ).first()
+
     if not seccion:
-        raise HTTPException(status_code=404, detail="Sección no encontrada o ya eliminada")
+        raise HTTPException(
+            status_code=404,
+            detail="Sección no encontrada o ya eliminada"
+        )
+
+    stock = db.execute(
+        text("""
+            SELECT cantidad
+            FROM vw_stock_por_sucursal_almacen_modelo
+            WHERE almacenId = :almacenId
+              AND modeloId = :modeloId
+        """),
+        {
+            "almacenId": seccion.almacenId,
+            "modeloId": seccion.modeloId,
+        }
+    ).mappings().first()
+
+    cantidad = stock["cantidad"] if stock else 0
+
+    if cantidad > 0:
+        raise HTTPException(
+            status_code=400,
+            detail=f"No se puede eliminar la sección porque tiene stock disponible ({cantidad} unidades)."
+        )
 
     seccion.estado = 0
     db.commit()
-    return {"mensaje": "Sección eliminada correctamente (lógicamente)"}
 
+    return {"mensaje": "Sección eliminada correctamente"}
 
 # Listar secciones (con join a almacén y modelo) y filtrado por almacén
-def listar_secciones(db: Session, almacen_id: Optional[int] = None):
+def listar_secciones(
+    db: Session,
+    almacen_id: Optional[int] = None,
+    search: Optional[str] = None,
+    page: int = 1,
+    pageSize: int = 10
+):
     query = (
         db.query(
             Seccion,
@@ -141,22 +174,40 @@ def listar_secciones(db: Session, almacen_id: Optional[int] = None):
     if almacen_id is not None:
         query = query.filter(Seccion.almacenId == almacen_id)
 
-    rows = query.all()
-
-    resultado: List[dict] = []
-    for sec, alm_nombre, mod_nombre in rows:
-        resultado.append(
-            {
-                "id": sec.id,
-                "nombre": sec.nombre,
-                "almacenId": sec.almacenId,
-                "modeloId": sec.modeloId,
-                "descripcion": sec.descripcion,
-                "fechaRegistro": sec.fechaRegistro,
-                "estado": sec.estado,
-                "almacenNombre": alm_nombre,
-                "modeloNombre": mod_nombre,
-            }
+    if search and search.strip():
+        texto = f"%{search.strip()}%"
+        query = query.filter(
+            (Seccion.nombre.ilike(texto)) |
+            (Seccion.descripcion.ilike(texto)) |
+            (Almacen.nombre.ilike(texto)) |
+            (ModeloProducto.nombreModelo.ilike(texto))
         )
 
-    return resultado
+    total = query.count()
+
+    rows = (
+        query
+        .order_by(Seccion.id.desc())
+        .offset((page - 1) * pageSize)
+        .limit(pageSize)
+        .all()
+    )
+
+    items = []
+    for sec, alm_nombre, mod_nombre in rows:
+        items.append({
+            "id": sec.id,
+            "nombre": sec.nombre,
+            "almacenId": sec.almacenId,
+            "modeloId": sec.modeloId,
+            "descripcion": sec.descripcion,
+            "fechaRegistro": sec.fechaRegistro,
+            "estado": sec.estado,
+            "almacenNombre": alm_nombre,
+            "modeloNombre": mod_nombre,
+        })
+
+    return {
+        "items": items,
+        "total": total,
+    }

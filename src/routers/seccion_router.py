@@ -19,12 +19,21 @@ def get_db():
 def crear_seccion(seccion: SeccionCreate, db: Session = Depends(get_db)):
     return seccion_controller.crear_seccion(db, seccion)
 
-@router.get("/", response_model=List[SeccionResponse])
+@router.get("/")
 def listar_secciones(
     almacen_id: Optional[int] = Query(default=None, alias="almacenId"),
+    search: Optional[str] = Query(default=None),
+    page: int = Query(default=1),
+    pageSize: int = Query(default=10),
     db: Session = Depends(get_db),
 ):
-    return seccion_controller.listar_secciones(db, almacen_id)
+    return seccion_controller.listar_secciones(
+        db=db,
+        almacen_id=almacen_id,
+        search=search,
+        page=page,
+        pageSize=pageSize,
+    )
 
 @router.get("/{seccion_id}", response_model=SeccionResponse)
 def obtener_seccion(seccion_id: int, db: Session = Depends(get_db)):
