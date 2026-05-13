@@ -26,7 +26,6 @@ def _evaluar_alerta_stock(db: Session, modelo: ModeloProducto):
         tipo="STOCK_BAJO",
         mensaje=mensaje,
         empleadoId=None,
-        fecha=datetime.utcnow(),
     )
 
     db.add(alerta)

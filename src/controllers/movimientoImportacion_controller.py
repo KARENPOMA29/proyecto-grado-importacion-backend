@@ -150,8 +150,7 @@ def crear_movimiento_importacion(
             alerta = Alerta(
                 tipo="MOV_IMPORTACION",
                 mensaje=mensaje_alerta,
-                empleadoId=admin.id,       # 👈 aquí se guarda el 1 (Carlos)
-                fecha=datetime.utcnow(),
+                empleadoId=admin.id,
             )
             db.add(alerta)
             db.commit()

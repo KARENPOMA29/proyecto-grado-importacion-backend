@@ -27,18 +27,27 @@ def crear_movimiento(
     return movimiento_controller.crear_movimiento(db, payload, usuario_id)
 
 # 📋 Listar movimientos (filtros opcionales: usuarioId, almacenId)
-@router.get("/", response_model=List[MovimientoOut])
+@router.get("/")
 def listar_movimientos(
     usuarioId: Optional[int] = Query(default=None),
     almacenId: Optional[int] = Query(default=None),
+    search: Optional[str] = Query(default=None),
+    page: int = Query(default=1, ge=1),
+    pageSize: int = Query(default=10, ge=1, le=100),
     db: Session = Depends(get_db),
+    estadoProducto: Optional[int] = Query(default=None),
+    fecha: Optional[str] = Query(default=None),
 ):
     return movimiento_controller.listar_movimientos(
         db,
         usuario_id=usuarioId,
         almacen_id=almacenId,
+        search=search,
+        page=page,
+        page_size=pageSize,
+        estado_producto=estadoProducto,
+        fecha=fecha,
     )
-
 # 🔍 Obtener movimiento por ID
 @router.get("/{movimiento_id}", response_model=MovimientoOut)
 def obtener_movimiento(

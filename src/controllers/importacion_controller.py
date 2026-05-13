@@ -103,11 +103,10 @@ def crear_importacion(db: Session, payload: ImportacionCreate) -> Importacion:
         codigo=payload.codigo,
         proveedorId=payload.proveedorId,
         fechaLlegada=payload.fechaLlegada,
-        estado=1,  # activa al crear
+        estado=1,
         descripcion=payload.descripcion,
         empleadoId=payload.empleadoId,
         idEmpleadoAsignado=payload.idEmpleadoAsignado,
-        fechaRegistro=datetime.utcnow(),
     )
 
     db.add(obj)
@@ -251,3 +250,55 @@ def eliminar_importacion(db: Session, importacion_id: int) -> Dict[str, Any]:
     db.commit()
 
     return {"ok": True, "mensaje": "Importación desactivada correctamente"}
+
+def listar_importaciones_concluidas(
+    db: Session,
+    search: str | None = None,
+    page: int = 1,
+    pageSize: int = 1000,
+):
+    query = (
+        db.query(Importacion)
+        .options(
+            joinedload(Importacion.proveedor),
+            joinedload(Importacion.empleadoAsignado),
+        )
+        .filter(Importacion.estado == 2)
+    )
+
+    if search and search.strip():
+        term = f"%{search.strip().lower()}%"
+
+        query = (
+            query
+            .join(Proveedor, Importacion.proveedorId == Proveedor.id)
+            .join(Empleado, Importacion.idEmpleadoAsignado == Empleado.id)
+            .filter(
+                or_(
+                    func.lower(Importacion.codigo).like(term),
+                    func.lower(Importacion.descripcion).like(term),
+                    func.lower(Proveedor.razonSocial).like(term),
+                    func.lower(Empleado.nombre).like(term),
+                    func.lower(Empleado.apellido).like(term),
+                    func.lower(
+                        func.concat(Empleado.nombre, " ", Empleado.apellido)
+                    ).like(term),
+                    func.cast(Importacion.fechaLlegada, String).like(term),
+                )
+            )
+        )
+
+    total = query.count()
+
+    items = (
+        query
+        .order_by(Importacion.id.desc())
+        .offset((page - 1) * pageSize)
+        .limit(pageSize)
+        .all()
+    )
+
+    return {
+        "items": items,
+        "total": total,
+    }

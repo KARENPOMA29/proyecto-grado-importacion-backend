@@ -3,7 +3,7 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session
-
+from sqlalchemy import text
 from src.config.db import SessionLocal
 from src.schemas.producto import ProductoCreate, ProductoUpdate, ProductoOut
 from src.controllers import producto_controller as controller
@@ -21,6 +21,37 @@ def get_db():
     finally:
         db.close()
 
+
+
+@router.get("/disponibles/sucursal/{sucursal_id}")
+def productos_disponibles_por_sucursal(
+    sucursal_id: int,
+    db: Session = Depends(get_db),
+):
+    sql = text("""
+        SELECT
+            productoId AS id,
+            numeroSerie,
+            descripcion,
+            precio,
+            precioOrigen,
+            modeloId,
+            nombreModelo,
+            color,
+            capacidadOTamano,
+            urlImagen,
+            almacenId,
+            almacenNombre,
+            sucursalId,
+            sucursalNombre
+        FROM vw_productos_disponibles_por_sucursal
+        WHERE sucursalId = :sucursal_id
+        ORDER BY nombreModelo, numeroSerie
+    """)
+
+    result = db.execute(sql, {"sucursal_id": sucursal_id}).mappings().all()
+
+    return [dict(row) for row in result]
 
 # -------------------------------------------------------------------
 # POST /productos/  -> crear

@@ -38,7 +38,7 @@ class MovimientoOut(MovimientoBase):
     modeloProducto: Optional[ModeloProductoOut] = None
     categoria: Optional[CategoriaOut] = None
     importacion: Optional[ImportOut] = None
-
+    productoEstado: Optional[int] = None
     # campos planos para el details
     productoSerie: Optional[str] = None
     productoDescripcion: Optional[str] = None

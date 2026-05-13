@@ -1,7 +1,7 @@
 # src/routes/importacion_routes.py
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 
 
 from src.config.db import get_db
@@ -62,6 +62,19 @@ def crear_importacion(
 ):
     return importacion_controller.crear_importacion(db, payload)
 
+@router.get("/concluidas")
+def listar_importaciones_concluidas(
+    search: Optional[str] = Query(default=None),
+    page: int = Query(default=1),
+    pageSize: int = Query(default=1000),
+    db: Session = Depends(get_db),
+):
+    return importacion_controller.listar_importaciones_concluidas(
+        db=db,
+        search=search,
+        page=page,
+        pageSize=pageSize,
+    )
 
 @router.get("/{importacion_id}", response_model=ImportacionOut)
 def obtener_importacion(
