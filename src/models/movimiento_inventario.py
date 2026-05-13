@@ -49,3 +49,4 @@ class MovimientoInventario(Base):
         server_default="1",
         nullable=False
     )
+    

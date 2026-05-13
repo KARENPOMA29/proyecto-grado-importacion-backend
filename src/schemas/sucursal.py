@@ -24,6 +24,6 @@ class SucursalResponse(SucursalBase):
     estado: int
 
     ciudadNombre: Optional[str] = None   # 🔥 Front recibe esto
-
+    totalAlmacenes: int = 0
     class Config:
         from_attributes = True

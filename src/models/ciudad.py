@@ -11,4 +11,6 @@ class Ciudad(Base):
 
     # sucursales asociadas
     sucursales = relationship("Sucursal", back_populates="ciudad")
-    
+    @property
+    def totalSucursales(self):
+        return len([s for s in self.sucursales if s.estado == 1])

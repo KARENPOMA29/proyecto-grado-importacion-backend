@@ -1,7 +1,6 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from fastapi import HTTPException
 from typing import Optional
-
 from src.models.almacen import Almacen
 from src.models.sucursal import Sucursal
 from src.schemas.almacen import AlmacenCreate, AlmacenUpdate
@@ -46,7 +45,14 @@ def listar_almacenes(
     page: int = 1,
     pageSize: int = 10
 ):
-    query = db.query(Almacen).filter(Almacen.estado == 1)
+    query = (
+        db.query(Almacen)
+        .options(
+            joinedload(Almacen.sucursal),
+            joinedload(Almacen.secciones)
+        )
+        .filter(Almacen.estado == 1)
+    )
 
     if sucursal_id is not None:
         query = query.filter(Almacen.sucursalId == sucursal_id)

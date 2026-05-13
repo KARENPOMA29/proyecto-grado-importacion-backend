@@ -32,6 +32,7 @@ class AlmacenResponse(AlmacenBase):
     fechaRegistro: datetime
     estado: int
     sucursalNombre: Optional[str] = None  # 👈 viene del @property del modelo
-
+    totalSecciones: int = 0
+    
     class Config:
         from_attributes = True

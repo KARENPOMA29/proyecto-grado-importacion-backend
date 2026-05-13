@@ -5,7 +5,7 @@ from typing import List, Optional
 
 from src.config.db import SessionLocal
 from src.controllers import movimiento_controller
-from src.schemas.movimiento import MovimientoCreate, MovimientoOut, MovimientoUpdate
+from src.schemas.movimiento import MovimientoCreate, MovimientoOut, MovimientoUpdate, MovimientoDetalleUpdate
 
 router = APIRouter(prefix="/movimientos", tags=["Movimientos"])
 
@@ -48,6 +48,15 @@ def listar_movimientos(
         estado_producto=estadoProducto,
         fecha=fecha,
     )
+# 🔍 Obtener detalle completo del movimiento
+@router.get("/{movimiento_id}/detalle")
+def obtener_movimiento_detalle(
+    movimiento_id: int,
+    db: Session = Depends(get_db),
+):
+    return movimiento_controller.obtener_movimiento_detalle(db, movimiento_id)
+
+
 # 🔍 Obtener movimiento por ID
 @router.get("/{movimiento_id}", response_model=MovimientoOut)
 def obtener_movimiento(
@@ -55,7 +64,6 @@ def obtener_movimiento(
     db: Session = Depends(get_db),
 ):
     return movimiento_controller.obtener_movimiento(db, movimiento_id)
-
 # ✏️ Actualizar movimiento
 @router.put("/{movimiento_id}", response_model=MovimientoOut)
 def actualizar_movimiento(
@@ -70,7 +78,17 @@ def actualizar_movimiento(
         payload,
         usuario_id,
     )
-
+@router.put("/{movimiento_id}/detalle")
+def actualizar_movimiento_detalle(
+    movimiento_id: int,
+    payload: MovimientoDetalleUpdate,
+    db: Session = Depends(get_db),
+):
+    return movimiento_controller.actualizar_movimiento_detalle(
+        db,
+        movimiento_id,
+        payload,
+    )
 # 🗑️ Eliminar movimiento
 @router.delete("/{movimiento_id}")
 def eliminar_movimiento(

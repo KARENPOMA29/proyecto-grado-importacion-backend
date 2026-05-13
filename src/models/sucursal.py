@@ -47,3 +47,8 @@ class Sucursal(Base):
     @property
     def ciudadNombre(self):
         return self.ciudad.nombre if self.ciudad else None
+    
+    # src/models/sucursal.py
+    @property
+    def totalAlmacenes(self):
+        return len([a for a in self.almacenes if a.estado == 1])

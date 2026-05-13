@@ -22,7 +22,6 @@ def get_db():
         db.close()
 
 
-
 @router.get("/disponibles/sucursal/{sucursal_id}")
 def productos_disponibles_por_sucursal(
     sucursal_id: int,
@@ -105,6 +104,135 @@ def listar_productos(
         importacionId=importacionId,
         numeroSerie=numeroSerie,
     )
+
+
+
+
+@router.get("/buscador")
+def buscar_productos(
+    search: Optional[str] = Query(None),
+
+    estado: Optional[int] = Query(
+        1,
+        description="1=Disponible, 2=Vendido, 0=Inactivo"
+    ),
+
+    categoriaId: Optional[int] = Query(None),
+    modeloId: Optional[int] = Query(None),
+    ciudadId: Optional[int] = Query(None),
+    sucursalId: Optional[int] = Query(None),
+    almacenId: Optional[int] = Query(None),
+    seccionId: Optional[int] = Query(None),
+
+    observado: Optional[int] = Query(None),
+
+    page: int = Query(1, ge=1),
+    pageSize: int = Query(20, ge=1, le=100),
+
+    db: Session = Depends(get_db),
+):
+    offset = (page - 1) * pageSize
+
+    where = ["1 = 1"]
+
+    params = {
+        "offset": offset,
+        "pageSize": pageSize,
+    }
+
+    # ---------------------------------------------------------
+    # FILTROS
+    # ---------------------------------------------------------
+
+    if estado is not None:
+        where.append("productoEstado = :estado")
+        params["estado"] = estado
+
+    if categoriaId is not None:
+        where.append("categoriaId = :categoriaId")
+        params["categoriaId"] = categoriaId
+
+    if modeloId is not None:
+        where.append("modeloId = :modeloId")
+        params["modeloId"] = modeloId
+
+    if ciudadId is not None:
+        where.append("ciudadId = :ciudadId")
+        params["ciudadId"] = ciudadId
+
+    if sucursalId is not None:
+        where.append("sucursalId = :sucursalId")
+        params["sucursalId"] = sucursalId
+
+    if almacenId is not None:
+        where.append("almacenId = :almacenId")
+        params["almacenId"] = almacenId
+
+    if seccionId is not None:
+        where.append("seccionId = :seccionId")
+        params["seccionId"] = seccionId
+
+    if observado is not None:
+        where.append("observado = :observado")
+        params["observado"] = observado
+
+    # ---------------------------------------------------------
+    # BÚSQUEDA GENERAL
+    # ---------------------------------------------------------
+
+    if search and search.strip():
+        where.append("""
+        (
+            numeroSerie LIKE :search OR
+            descripcion LIKE :search OR
+            categoriaNombre LIKE :search OR
+            nombreModelo LIKE :search OR
+            ciudadNombre LIKE :search OR
+            sucursalNombre LIKE :search OR
+            almacenNombre LIKE :search OR
+            seccionNombre LIKE :search OR
+            importacionCodigo LIKE :search
+        )
+        """)
+
+        params["search"] = f"%{search.strip()}%"
+
+    where_sql = " AND ".join(where)
+
+    # ---------------------------------------------------------
+    # TOTAL
+    # ---------------------------------------------------------
+
+    total_sql = text(f"""
+        SELECT COUNT(*) AS total
+        FROM vw_productos_buscador
+        WHERE {where_sql}
+    """)
+
+    total = db.execute(total_sql, params).scalar() or 0
+
+    # ---------------------------------------------------------
+    # DATA
+    # ---------------------------------------------------------
+
+    data_sql = text(f"""
+        SELECT *
+        FROM vw_productos_buscador
+        WHERE {where_sql}
+        ORDER BY fechaRegistro DESC
+        OFFSET :offset ROWS
+        FETCH NEXT :pageSize ROWS ONLY
+    """)
+
+    rows = db.execute(data_sql, params).mappings().all()
+
+    return {
+        "items": [dict(row) for row in rows],
+        "total": total,
+        "page": page,
+        "pageSize": pageSize,
+    }
+
 # -------------------------------------------------------------------
 # GET /productos/{id} -> obtener por ID (solo activos)
 # -------------------------------------------------------------------

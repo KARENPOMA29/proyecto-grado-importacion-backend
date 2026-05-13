@@ -13,6 +13,6 @@ class CiudadUpdate(BaseModel):
 
 class CiudadResponse(CiudadBase):
     id: int
-
+    totalSucursales: int = 0
     class Config:
         from_attributes = True

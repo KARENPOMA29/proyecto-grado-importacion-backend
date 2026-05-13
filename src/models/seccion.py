@@ -8,7 +8,7 @@ from sqlalchemy import (
 )
 
 from src.config.db import Base
-
+from sqlalchemy.orm import relationship
 
 class Seccion(Base):
     __tablename__ = "Seccion"
@@ -45,3 +45,5 @@ class Seccion(Base):
         server_default="1",
         nullable=False
     )
+
+    almacen = relationship("Almacen", back_populates="secciones")

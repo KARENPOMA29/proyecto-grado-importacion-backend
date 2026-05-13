@@ -25,3 +25,8 @@ class Almacen(Base):
     @property
     def sucursalNombre(self):
         return self.sucursal.nombre if self.sucursal else None
+    
+    secciones = relationship("Seccion", back_populates="almacen")
+    @property
+    def totalSecciones(self):
+        return len([s for s in self.secciones if s.estado == 1])
