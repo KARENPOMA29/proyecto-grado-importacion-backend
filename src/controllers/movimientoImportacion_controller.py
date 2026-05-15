@@ -8,6 +8,9 @@ from src.models.movimiento_importacion import MovimientoImportacion
 from src.models.alerta import Alerta
 from src.models.importacion import Importacion        
 from src.models.empleado import Empleado    
+from src.controllers.alerta_controller import (
+    obtener_configuracion_alerta,
+)
 from src.schemas.movimiento_importacion import (
     MovimientoImportacionCreate,
     MovimientoImportacionUpdate,
@@ -57,28 +60,50 @@ def verificar_y_concluir_importacion(db: Session, importacion_id: int):
     db.commit()
     db.refresh(importacion)
 
-    admin = (
+    config = obtener_configuracion_alerta(db, "IMPORTACION_CONCLUIDA")
+
+    if not config or not config["activo"]:
+        print("ℹ️ Alerta IMPORTACION_CONCLUIDA desactivada por configuración.")
+        return
+
+    admins = (
         db.query(Empleado)
         .filter(
-            Empleado.rol.in_(["ADMIN", "Administrador"]),
+            Empleado.rol.in_(["ADMIN", "Administrador", "Adminnistrador"]),
             Empleado.estado == 1,
         )
-        .first()
+        .all()
     )
 
-    if admin and admin.correo:
-        resumen = "\n".join([
-            f"- {m.tipoMovimiento}: {m.descripcion or 'Sin descripción'}"
-            for m in movimientos
-        ])
+    resumen = "\n".join([
+        f"- {m.tipoMovimiento}: {m.descripcion or 'Sin descripción'}"
+        for m in movimientos
+    ])
 
-        enviar_notificacion_importacion_concluida(
-            correo_admin=admin.correo,
-            codigo_importacion=importacion.codigo,
-            descripcion=importacion.descripcion,
-            fecha_llegada=str(importacion.fechaLlegada),
-            movimientos=resumen,
-        )
+    mensaje_alerta = (
+        f"La importación {importacion.codigo} fue concluida correctamente."
+    )
+
+    for admin in admins:
+        if config["enviarCorreo"] and admin.correo:
+            enviar_notificacion_importacion_concluida(
+                correo_admin=admin.correo,
+                codigo_importacion=importacion.codigo,
+                descripcion=importacion.descripcion,
+                fecha_llegada=str(importacion.fechaLlegada),
+                movimientos=resumen,
+            )
+
+        if config["crearNotificacion"]:
+            alerta = Alerta(
+                tipo="IMPORTACION_CONCLUIDA",
+                mensaje=mensaje_alerta,
+                empleadoId=admin.id,
+            )
+            db.add(alerta)
+
+    db.commit()
+    print("✅ Alertas IMPORTACION_CONCLUIDA procesadas según configuración.")
 
 def crear_movimiento_importacion(
     db: Session,
@@ -95,7 +120,7 @@ def crear_movimiento_importacion(
     db.add(nuevo)
     db.commit()
     db.refresh(nuevo)
-
+    
     # ────────────── 🔔 Notificación por correo + ALERTA ──────────────
     try:
         # 1) Importación (para el código)
@@ -121,44 +146,45 @@ def crear_movimiento_importacion(
         )
 
         # 3) Admin activo (en tu caso Carlos)
-        admin = (
-            db.query(Empleado)
-            .filter(
-                Empleado.rol.in_(["ADMIN", "Administrador"]),
-                Empleado.estado == 1,
-            )
-            .first()
-        )
+        config = obtener_configuracion_alerta(db, "MOV_IMPORTACION")
 
-        if admin:
-            # 3.1 correo
-            if admin.correo:
-                enviar_notificacion_movimiento(
-                    correo_admin=admin.correo,
-                    codigo_importacion=codigo_importacion,
-                    tipo_movimiento=nuevo.tipoMovimiento,
-                    descripcion=nuevo.descripcion,
-                    empleado_encargado=nombre_encargado,
+        if not config or not config["activo"]:
+            print("ℹ️ Alerta MOV_IMPORTACION desactivada por configuración.")
+        else:
+            admins = (
+                db.query(Empleado)
+                .filter(
+                    Empleado.rol.in_(["ADMIN", "Administrador", "Adminnistrador"]),
+                    Empleado.estado == 1,
                 )
+                .all()
+            )
 
-            # 3.2 alerta en BD
             mensaje_alerta = (
                 f"Nuevo movimiento {nuevo.tipoMovimiento} en importación "
                 f"{codigo_importacion} (encargado: {nombre_encargado or 'N/D'})."
             )
 
-            alerta = Alerta(
-                tipo="MOV_IMPORTACION",
-                mensaje=mensaje_alerta,
-                empleadoId=admin.id,
-            )
-            db.add(alerta)
+            for admin in admins:
+                if config["enviarCorreo"] and admin.correo:
+                    enviar_notificacion_movimiento(
+                        correo_admin=admin.correo,
+                        codigo_importacion=codigo_importacion,
+                        tipo_movimiento=nuevo.tipoMovimiento,
+                        descripcion=nuevo.descripcion,
+                        empleado_encargado=nombre_encargado,
+                    )
+
+                if config["crearNotificacion"]:
+                    alerta = Alerta(
+                        tipo="MOV_IMPORTACION",
+                        mensaje=mensaje_alerta,
+                        empleadoId=admin.id,
+                    )
+                    db.add(alerta)
+
             db.commit()
-
-            print("✅ Alerta de movimiento creada para empleadoId =", admin.id)
-        else:
-            print("⚠️ No se encontró administrador activo para crear alerta.")
-
+            print("✅ Alertas MOV_IMPORTACION procesadas según configuración.")
     except Exception as e:
         # No romper el flujo si falla
         print(f"❌ Error al procesar notificación/alerta de movimiento: {e}")

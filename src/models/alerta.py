@@ -19,6 +19,9 @@ class Alerta(Base):
 
     tipo = Column(String(50), nullable=False)
 
+    # 🔥 NUEVO
+    referencia = Column(String(200), nullable=True)
+
     mensaje = Column(String(200), nullable=False)
 
     empleadoId = Column(Integer, nullable=True)

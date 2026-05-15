@@ -4,6 +4,7 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
+from src.controllers import alerta_controller
 from src.config.db import SessionLocal
 from src.models.alerta import Alerta
 from src.models.empleado import Empleado
@@ -71,3 +72,7 @@ def marcar_alerta_leida_endpoint(id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Alerta no encontrada")
 
     return {"mensaje": "Alerta marcada como leída"}
+
+@router.post("/verificar-stock-bajo")
+def verificar_stock_bajo_endpoint(db: Session = Depends(get_db)):
+    return alerta_controller.verificar_stock_bajo(db)

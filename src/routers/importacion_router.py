@@ -14,19 +14,20 @@ from src.controllers import importacion_controller
 
 router = APIRouter(prefix="/importaciones", tags=["Importaciones"])
 
-@router.get(
-    "/empleado/{empleado_id}",
-    response_model=List[ImportacionOut],
-)
-def listar_importaciones_por_empleado(
+@router.get("/empleado/{empleado_id}")
+def listar_por_empleado(
     empleado_id: int,
+    search: Optional[str] = Query(None),
+    page: int = Query(1, ge=1),
+    pageSize: int = Query(10, ge=1),
     db: Session = Depends(get_db),
 ):
-    """
-    Devuelve las importaciones activas asignadas al empleado (idEmpleadoAsignado = empleado_id).
-    """
     return importacion_controller.listar_importaciones_por_empleado(
-        db, empleado_id
+        db=db,
+        empleado_id=empleado_id,
+        search=search,
+        page=page,
+        pageSize=pageSize,
     )
 
 @router.get("/control")

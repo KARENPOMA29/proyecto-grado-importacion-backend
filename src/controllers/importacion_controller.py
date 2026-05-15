@@ -65,23 +65,49 @@ def listar_control_importaciones(
 def listar_importaciones_por_empleado(
     db: Session,
     empleado_id: int,
-) -> List[Importacion]:
-    """
-    Lista las importaciones NO ELIMINADAS (estado != 0) asignadas a un empleado específico.
-
-    Se toma como referencia el campo idEmpleadoAsignado, que representa
-    al empleado encargado de la importación.
-    """
-    return (
-        db.query(Importacion)
+    search: str | None = None,
+    page: int = 1,
+    pageSize: int = 10,
+):
+    query = (
+        db.query(VwControlImportaciones)
+        .join(
+            Importacion,
+            Importacion.id == VwControlImportaciones.id
+        )
         .filter(
             Importacion.idEmpleadoAsignado == empleado_id,
-            Importacion.estado != 0,  # incluye 1 (activa) y 2 (concluida)
+            Importacion.estado != 0
         )
+    )
+
+    if search and search.strip():
+        term = f"%{search.strip().lower()}%"
+
+        query = query.filter(
+            or_(
+                func.lower(VwControlImportaciones.codigo).like(term),
+                func.lower(VwControlImportaciones.proveedorNombre).like(term),
+                func.lower(VwControlImportaciones.proveedorEncargado).like(term),
+                func.lower(VwControlImportaciones.empleadoAsignadoNombre).like(term),
+                func.lower(VwControlImportaciones.situacion).like(term),
+            )
+        )
+
+    total = query.count()
+
+    items = (
+        query
+        .order_by(VwControlImportaciones.fechaLlegada.asc())
+        .offset((page - 1) * pageSize)
+        .limit(pageSize)
         .all()
     )
 
-
+    return {
+        "items": items,
+        "total": total,
+    }
 def crear_importacion(db: Session, payload: ImportacionCreate) -> Importacion:
     """
     Crea una nueva importación.

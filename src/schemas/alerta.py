@@ -5,13 +5,15 @@ from pydantic import BaseModel
 
 class AlertaBase(BaseModel):
     tipo: str
+
+    # 🔥 NUEVO
+    referencia: str | None = None
+
     mensaje: str
     empleadoId: int | None = None
 
 
 class AlertaCreate(AlertaBase):
-    # por si quieres pasar 0 o 1 explícitamente;
-    # si no mandas nada, será 1 (activa)
     estado: int = 1
 
 
