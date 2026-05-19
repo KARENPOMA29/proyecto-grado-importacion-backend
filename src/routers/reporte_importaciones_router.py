@@ -25,7 +25,6 @@ def get_db():
 def dashboard_importaciones(db: Session = Depends(get_db)):
     return controller.obtener_dashboard(db)
 
-
 @router.get("/retrasadas")
 def importaciones_retrasadas(
     search: Optional[str] = Query(None),
@@ -34,6 +33,7 @@ def importaciones_retrasadas(
     proveedor: Optional[str] = Query(None),
     empleado: Optional[str] = Query(None),
     nivelRetraso: Optional[str] = Query(None),
+    estadoRetraso: Optional[str] = Query(None),
     db: Session = Depends(get_db),
 ):
     return controller.obtener_importaciones_retrasadas(
@@ -44,8 +44,8 @@ def importaciones_retrasadas(
         proveedor,
         empleado,
         nivelRetraso,
+        estadoRetraso,
     )
-
 
 @router.get("/concluidas")
 def importaciones_concluidas(

@@ -206,7 +206,6 @@ def crear_venta(db: Session, venta_in: VentaCreate) -> Venta:
             productoId=det.productoId,
             subtotal=subtotal,
         )
-
         db.add(detalle_db)
 
         # ================================================
@@ -216,30 +215,7 @@ def crear_venta(db: Session, venta_in: VentaCreate) -> Venta:
         prod.estado = 2
         db.add(prod)
 
-        # ================================================
-        # DESCONTAR STOCK DEL MODELO
-        # ================================================
-
-        modelo = (
-            db.query(ModeloProducto)
-            .filter(ModeloProducto.id == prod.modeloId)
-            .first()
-        )
-
-        if modelo:
-
-            if int(modelo.stockActual or 0) <= 0:
-                raise HTTPException(
-                    status_code=400,
-                    detail=(
-                        f"No hay stock disponible "
-                        f"para el modelo "
-                        f"{modelo.nombreModelo}."
-                    ),
-                )
-
-            modelo.stockActual -= 1
-            db.add(modelo)
+        
 
     # =====================================================
     # GUARDAR

@@ -2,7 +2,7 @@
 from datetime import datetime
 from sqlalchemy.orm import Session
 from sqlalchemy import text
-
+from src.utils.mailer import _enviar_correo
 from src.models.alerta import Alerta
 from src.models.empleado import Empleado
 from src.schemas.alerta import AlertaCreate
@@ -113,17 +113,8 @@ def crear_alerta_directa(
 # ============================================================
 # ALERTAS DE STOCK BAJO
 # ============================================================
-
 def verificar_stock_bajo(db: Session):
     config = obtener_configuracion_alerta(db, "STOCK_BAJO")
-
-    if not config or not config["activo"]:
-        print("ℹ️ Alerta STOCK_BAJO desactivada por configuración.")
-        return {
-            "ok": True,
-            "mensaje": "Alerta STOCK_BAJO desactivada.",
-            "alertasCreadas": 0,
-        }
 
     productos_bajos = db.execute(
         text("""
@@ -144,20 +135,8 @@ def verificar_stock_bajo(db: Session):
         """)
     ).fetchall()
 
-    if not productos_bajos:
-        print("✅ No hay productos con stock bajo.")
-        return {
-            "ok": True,
-            "mensaje": "No hay productos con stock bajo.",
-            "alertasCreadas": 0,
-        }
-
-    admins = obtener_administradores_activos(
-        db,
-        config.get("destinatariosRol")
-    )
-
-    alertas_creadas = 0
+    referencias_actuales = set()
+    productos = []
 
     for row in productos_bajos:
         item = dict(row._mapping)
@@ -170,6 +149,40 @@ def verificar_stock_bajo(db: Session):
             f"{item['modeloId']}"
         )
 
+        item["referencia"] = referencia
+        referencias_actuales.add(referencia)
+        productos.append(item)
+
+    # Cierra automáticamente las alertas que ya no están en stock bajo
+    query = db.query(Alerta).filter(
+        Alerta.tipo == "STOCK_BAJO",
+        Alerta.estado == 1,
+    )
+
+    if referencias_actuales:
+        alertas_cerradas = query.filter(
+            ~Alerta.referencia.in_(referencias_actuales)
+        ).update({Alerta.estado: 0}, synchronize_session=False)
+    else:
+        alertas_cerradas = query.update(
+            {Alerta.estado: 0},
+            synchronize_session=False
+        )
+
+    if not config or not config["activo"]:
+        db.commit()
+        return {
+            "ok": True,
+            "mensaje": "STOCK_BAJO desactivado. Alertas cerradas.",
+            "alertasCreadas": 0,
+            "alertasCerradas": alertas_cerradas,
+        }
+
+    admins = obtener_administradores_activos(db, config.get("destinatariosRol"))
+
+    alertas_creadas = 0
+
+    for item in productos:
         mensaje = (
             f"Stock bajo detectado: {item['nombreModelo']} | "
             f"Ciudad: {item['ciudad'] or 'N/D'} | "
@@ -180,40 +193,97 @@ def verificar_stock_bajo(db: Session):
         )
 
         for admin in admins:
-            # Evitar duplicados activos
+            # Busca cualquier alerta existente, activa o cerrada
             existe = db.query(Alerta).filter(
                 Alerta.tipo == "STOCK_BAJO",
-                Alerta.referencia == referencia,
+                Alerta.referencia == item["referencia"],
                 Alerta.empleadoId == admin.id,
-                Alerta.estado == 1,
             ).first()
 
             if existe:
+                # Si sigue en stock bajo, la mantiene activa y actualiza mensaje/fecha
+                existe.estado = 1
+                existe.mensaje = mensaje
+                existe.fecha = datetime.now()
                 continue
 
-            if config["crearNotificacion"]:
-                alerta = Alerta(
-                    tipo="STOCK_BAJO",
-                    referencia=referencia,
-                    mensaje=mensaje,
-                    empleadoId=admin.id,
-                    fecha=datetime.now(),
-                    estado=1,
-                )
-                db.add(alerta)
-                alertas_creadas += 1
-
-            if config["enviarCorreo"] and admin.correo:
-                # Por ahora solo usamos correo simple si ya tienes función propia.
-                # Si tienes enviar_alerta_stock en mailer.py, lo conectamos después.
-                print(f"📧 Stock bajo para enviar a {admin.correo}: {mensaje}")
+            alerta = Alerta(
+                tipo="STOCK_BAJO",
+                referencia=item["referencia"],
+                mensaje=mensaje,
+                empleadoId=admin.id,
+                fecha=datetime.now(),
+                estado=1,
+            )
+            db.add(alerta)
+            alertas_creadas += 1
 
     db.commit()
-
-    print(f"✅ Alertas STOCK_BAJO creadas: {alertas_creadas}")
 
     return {
         "ok": True,
         "mensaje": "Verificación de stock bajo completada.",
         "alertasCreadas": alertas_creadas,
+        "alertasCerradas": alertas_cerradas,
+    }
+
+
+# ============================================================
+# ENVIAR RESUMEN STOCK BAJO POR CORREO
+# ============================================================
+
+def enviar_resumen_stock_bajo_correo(db: Session):
+    alertas = db.query(Alerta).filter(
+        Alerta.tipo == "STOCK_BAJO",
+        Alerta.estado == 1,
+    ).all()
+
+    if not alertas:
+        return {
+            "ok": True,
+            "mensaje": "No hay alertas de stock bajo para enviar.",
+            "enviados": 0,
+        }
+
+    admins = obtener_administradores_activos(db)
+
+    asunto = "IMPORT SYSTEM - Resumen de stock bajo"
+
+    cuerpo = "Estimado Administrador,\n\n"
+    cuerpo += "Actualmente existen los siguientes productos con stock bajo:\n\n"
+
+    for alerta in alertas:
+        cuerpo += f"- {alerta.mensaje}\n"
+
+    cuerpo += "\nPor favor, revise el inventario.\n\n"
+    cuerpo += "Saludos,\nSistema de Gestión de Importaciones"
+
+    enviados = 0
+    correos_enviados = set()
+
+    for admin in admins:
+
+        if not admin.correo:
+            continue
+
+        correo = admin.correo.strip().lower()
+
+        # evita duplicados
+        if correo in correos_enviados:
+            continue
+
+        ok = _enviar_correo(
+            destinatario=correo,
+            asunto=asunto,
+            cuerpo=cuerpo,
+        )
+
+        if ok:
+            enviados += 1
+            correos_enviados.add(correo)
+
+    return {
+        "ok": True,
+        "mensaje": "Resumen de stock bajo enviado al correo.",
+        "enviados": enviados,
     }

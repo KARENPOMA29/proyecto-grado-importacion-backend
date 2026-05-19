@@ -76,3 +76,9 @@ def marcar_alerta_leida_endpoint(id: int, db: Session = Depends(get_db)):
 @router.post("/verificar-stock-bajo")
 def verificar_stock_bajo_endpoint(db: Session = Depends(get_db)):
     return alerta_controller.verificar_stock_bajo(db)
+
+
+
+@router.post("/enviar-stock-bajo-correo")
+def enviar_stock_bajo_correo(db: Session = Depends(get_db)):
+    return alerta_controller.enviar_resumen_stock_bajo_correo(db)

@@ -6,25 +6,29 @@ from src.models.empleado import Empleado
 from src.schemas.auth import LoginRequest
 from src.utils.security import md5_hash
 from src.utils.mailer import enviar_credenciales
+from src.models.sucursal import Sucursal
 
 
 def login_empleado(db: Session, credentials: LoginRequest):
-    # Buscar el empleado por usuario
     empleado = db.query(Empleado).filter(
         Empleado.usuario == credentials.usuario,
         Empleado.estado == 1
     ).first()
 
     if not empleado:
-        raise HTTPException(status_code=401, detail=" Usuario o contraseña incorrectos")
+        raise HTTPException(status_code=401, detail="Usuario o contraseña incorrectos")
 
-    # hashear lo que llega del frontend
     pwd_hash = md5_hash(credentials.contrasena)
 
     if empleado.contrasena != pwd_hash:
-        raise HTTPException(status_code=401, detail=" Usuario o contraseña incorrectos")
+        raise HTTPException(status_code=401, detail="Usuario o contraseña incorrectos")
 
-    # devolver datos limpios
+    sucursal = None
+    if empleado.idSucursal:
+        sucursal = db.query(Sucursal).filter(
+            Sucursal.id == empleado.idSucursal
+        ).first()
+
     return {
         "id": empleado.id,
         "nombre": empleado.nombre,
@@ -32,9 +36,9 @@ def login_empleado(db: Session, credentials: LoginRequest):
         "rol": empleado.rol,
         "correo": empleado.correo,
         "usuario": empleado.usuario,
-        "idSucursal": empleado.idSucursal
+        "idSucursal": empleado.idSucursal,
+        "sucursalNombre": sucursal.nombre if sucursal else None,
     }
-
 
 def recuperar_contrasena_empleado(db: Session, correo: str, ci: str):
     """

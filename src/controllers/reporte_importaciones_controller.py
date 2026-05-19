@@ -94,6 +94,7 @@ def obtener_importaciones_retrasadas(
     proveedor=None,
     empleado=None,
     nivelRetraso=None,
+    estadoRetraso=None,
 ):
     where_sql, params = _build_where(
         search=search,
@@ -103,17 +104,26 @@ def obtener_importaciones_retrasadas(
         empleado=empleado,
     )
 
-    extra = ""
+    filtros_extra = []
 
     if nivelRetraso:
-        extra = " AND nivelRetraso = :nivelRetraso" if where_sql else " WHERE nivelRetraso = :nivelRetraso"
+        filtros_extra.append("nivelRetraso = :nivelRetraso")
         params["nivelRetraso"] = nivelRetraso
+
+    if estadoRetraso:
+        filtros_extra.append("estadoRetraso = :estadoRetraso")
+        params["estadoRetraso"] = estadoRetraso
+
+    if filtros_extra:
+        if where_sql:
+            where_sql += " AND " + " AND ".join(filtros_extra)
+        else:
+            where_sql = " WHERE " + " AND ".join(filtros_extra)
 
     sql = text(f"""
         SELECT *
         FROM vw_importaciones_retrasadas
         {where_sql}
-        {extra}
         ORDER BY diasRetraso DESC
     """)
 
